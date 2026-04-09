@@ -34,7 +34,7 @@ function PlusIcon() {
       <div className="absolute inset-[8.33%]">
         <div className="absolute inset-[-4.55%]">
           <svg className="block size-full" fill="none" preserveAspectRatio="none" viewBox="0 0 18 18">
-            <path d={svgPaths.p253fc100} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
+            <path d="M9 3V15M3 9H15" fill="none" stroke="#FFFFFF" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
           </svg>
         </div>
       </div>

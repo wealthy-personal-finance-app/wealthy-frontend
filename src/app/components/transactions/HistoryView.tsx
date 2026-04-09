@@ -57,7 +57,7 @@ export function HistoryView({
         {/* Row: search input + filter button */}
         <div className="flex gap-[12px] items-center w-full">
 
-          {/* Search Input — bg-[#141414] matching Figma Buttons1 */}
+          {/* Search Input — bg-[#141414] Wealthy design system */}
           <div className="bg-[#141414] flex-1 h-[40px] min-w-0 relative rounded-[8px]">
             <div className="flex flex-row items-center overflow-clip rounded-[inherit] size-full">
               <div className="flex gap-[4px] items-center p-[8px] relative size-full">
@@ -153,7 +153,7 @@ export function HistoryView({
                 key={group.date}
                 className="flex flex-col gap-[12px] items-start w-full"
               >
-                {/* Date heading — left-[8px] offset matching Figma Heading1 */}
+                {/* Date heading — left-[8px] offset Wealthy design system */}
                 <div className="h-[21px] relative shrink-0 w-full">
                   <p
                     className="absolute left-[8px] top-0 whitespace-nowrap"
@@ -169,7 +169,7 @@ export function HistoryView({
                   </p>
                 </div>
 
-                {/* Rows — gap-[12px] matching Figma Container5 */}
+                {/* Rows — gap-[12px] Wealthy design system */}
                 <div className="flex flex-col gap-[12px] items-start w-full">
                   {group.transactions.map((transaction) => (
                     <TransactionRow
