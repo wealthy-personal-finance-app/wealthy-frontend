@@ -494,7 +494,7 @@ function CategorySubmenu({
                     sideOffset={8}
                     onMouseEnter={() => setActiveParent(parent)}
                     onMouseLeave={() => setActiveParent(null)}
-                    className="z-[100]"
+                    className="z-[100] animate-in fade-in zoom-in-95 duration-200"
                   >
                     <CategoryChildrenSubmenu parentCategory={parent} selected={selected} onToggle={onToggle} />
                   </Popover.Content>
@@ -586,7 +586,7 @@ export function FilterMenu({ onChange, initialFilters }: FilterMenuProps) {
       </Popover.Trigger>
 
       <Popover.Portal>
-        <Popover.Content side="bottom" align="start" sideOffset={8} className="z-50 w-[280px]">
+        <Popover.Content side="bottom" align="start" sideOffset={8} className="z-50 w-[280px] animate-in fade-in zoom-in-95 duration-200">
           <div className="bg-[#15161a] relative rounded-[16px] size-full">
             <div className="content-stretch flex flex-col gap-[16px] items-start overflow-clip p-[16px] relative rounded-[inherit] size-full">
               <div className="content-stretch flex items-center relative shrink-0 w-full">
@@ -625,7 +625,7 @@ export function FilterMenu({ onChange, initialFilters }: FilterMenuProps) {
                           sideOffset={8}
                           onMouseEnter={() => setActiveMenu(id)}
                           onMouseLeave={() => setActiveMenu(null)}
-                          className="z-[100]"
+                          className="z-[100] animate-in fade-in zoom-in-95 duration-200"
                         >
                           {renderSubmenu(id)}
                         </Popover.Content>

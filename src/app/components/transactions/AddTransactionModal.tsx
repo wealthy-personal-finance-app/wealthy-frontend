@@ -10,7 +10,7 @@ export interface CategoryData {
   masterCategory: string;
 }
 
-const initialExpenseCategories: CategoryData[] = [
+export const initialExpenseCategories: CategoryData[] = [
   { id: 'housing', label: 'Housing', icon: 'house', masterCategory: 'Essential Living' },
   { id: 'food', label: 'Food & Dining', icon: 'coffee', masterCategory: 'Essential Living' },
   { id: 'transportation', label: 'Transportation', icon: 'bus', masterCategory: 'Essential Living' },
@@ -28,7 +28,7 @@ const initialExpenseCategories: CategoryData[] = [
   { id: 'misc', label: 'Miscellaneous', icon: 'more-horizontal', masterCategory: 'Unplanned' }
 ];
 
-const initialIncomeCategories: CategoryData[] = [
+export const initialIncomeCategories: CategoryData[] = [
   { id: 'salary', label: 'Salary/Wages', icon: 'wallet', masterCategory: 'Earned Income' },
   { id: 'bonus', label: 'Bonuses & Commissions', icon: 'award', masterCategory: 'Earned Income' },
   { id: 'freelance', label: 'Freelance/Side Hustle', icon: 'briefcase', masterCategory: 'Earned Income' },
@@ -39,7 +39,7 @@ const initialIncomeCategories: CategoryData[] = [
   { id: 'refunds', label: 'Refunds/Reimbursements', icon: 'refresh-ccw', masterCategory: 'Other Income' }
 ];
 
-const initialAssetCategories: CategoryData[] = [
+export const initialAssetCategories: CategoryData[] = [
   { id: 'cash', label: 'Cash & Equivalents', icon: 'dollar-sign', masterCategory: 'Liquid Assets' },
   { id: 'bank', label: 'Bank Accounts', icon: 'landmark', masterCategory: 'Liquid Assets' },
   { id: 'stocks', label: 'Stocks', icon: 'trending-up', masterCategory: 'Investments' },
@@ -49,7 +49,7 @@ const initialAssetCategories: CategoryData[] = [
   { id: 'vehicles', label: 'Vehicles', icon: 'car', masterCategory: 'Personal Property' }
 ];
 
-const initialLiabilityCategories: CategoryData[] = [
+export const initialLiabilityCategories: CategoryData[] = [
   { id: 'credit-cards', label: 'Credit Cards', icon: 'credit-card', masterCategory: 'Short-Term Liabilities' },
   { id: 'personal-loans', label: 'Personal Loans', icon: 'file-text', masterCategory: 'Short-Term Liabilities' },
   { id: 'mortgages', label: 'Mortgages', icon: 'home', masterCategory: 'Long-Term Liabilities' },
@@ -57,13 +57,6 @@ const initialLiabilityCategories: CategoryData[] = [
   { id: 'auto-loans', label: 'Auto Loans', icon: 'car', masterCategory: 'Long-Term Liabilities' }
 ];
 
-const masterCategoryOptions = [
-  'Essential Living',
-  'Obligations & Liabilities',
-  'Discretionary & Lifestyle',
-  'Growth & Giving',
-  'Unplanned'
-];
 
 type AllowedTypes = 'Expense' | 'Income' | 'Asset' | 'Liability';
 
@@ -126,6 +119,8 @@ export function AddTransactionModal({ onClose, onSave }: AddTransactionModalProp
       transactionType === 'Income' ? allIncomeCats :
         transactionType === 'Asset' ? allAssetCats :
           allLiabilityCats;
+
+  const masterCategoryOptions = Array.from(new Set(currentCategories.map(c => c.masterCategory)));
 
   // Filter Categories
   const filteredCategories = currentCategories.filter(c =>
@@ -407,7 +402,7 @@ export function AddTransactionModal({ onClose, onSave }: AddTransactionModalProp
                 </div>
 
                 {isCalendarOpen && (
-                  <div className="absolute top-[100%] left-0 right-0 z-[60] bg-[#15161a] border border-[#2e2f33] border-t-0 rounded-b-[16px] p-[16px] shadow-[0px_10px_100px_0px_rgba(10,10,57,0.15)] animate-in slide-in-from-top-2 duration-200">
+                  <div className="absolute top-[100%] left-0 right-0 z-[60] bg-[#15161a] border border-[#2e2f33] border-t-0 rounded-b-[16px] p-[16px] shadow-[0px_10px_100px_0px_rgba(10,10,57,0.15)] animate-in fade-in slide-in-from-top-2 duration-200">
                     <div className="flex items-center justify-between mb-[12px]">
                       <button onClick={() => changeMonth(-1)} className="p-[4px] hover:bg-[#2e2f33]/40 rounded-full transition-colors text-[#99a0ae]">
                         <ChevronLeft size={16} />
