@@ -77,7 +77,7 @@ function DashboardHeader({ data }: { data: typeof mockDashboardData }) {
       <div className="flex items-start justify-between w-full">
         <div className="flex flex-col gap-[8px]">
           {/* Account Selector */}
-          <button className="bg-[rgba(65,63,63,0.5)] border border-[#2e2f33] rounded-[8px] px-[16px] py-[8px] flex items-center gap-[8px] w-fit hover:bg-[#2e2f33] transition-colors cursor-pointer">
+          <button className="bg-[rgba(65,63,63,0.5)] border border-[#2e2f33] rounded-[8px] px-[16px] py-[8px] flex items-center gap-[8px] w-fit hover:bg-[#2e2f33] transition-colors">
             <span className="text-[16px] text-[#99a0ae] font-['Inter_Tight',sans-serif]">
               {activeAccount}
             </span>
@@ -130,22 +130,15 @@ function ChartCard({ title, data, dataKey, color, icon: Icon }: any) {
         <div className="w-[24px] h-[24px] bg-[#2e2f33] rounded-[6px] flex items-center justify-center">
           <Icon size={14} className="text-[#99a0ae]" />
         </div>
-        <h2 className="text-[16px] font-medium text-white font-['Inter_Tight',sans-serif] whitespace-nowrap">{title}</h2>
+        <h2 className="text-[16px] font-medium text-white font-['Inter_Tight',sans-serif]">{title}</h2>
       </div>
 
       <div className="h-[200px] w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
+          <BarChart data={data} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#2e2f33" vertical={false} />
             <XAxis dataKey="month" stroke="#717784" fontSize={12} tickLine={false} axisLine={false} />
-            <YAxis 
-              stroke="#717784" 
-              fontSize={12} 
-              tickLine={false} 
-              axisLine={false} 
-              tickFormatter={(val) => `${val/1000}k`}
-              width={45}
-            />
+            <YAxis stroke="#717784" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `LKR ${val/1000}k`} />
             <Tooltip 
               cursor={{ fill: 'rgba(255,255,255,0.05)' }}
               contentStyle={{ backgroundColor: '#101214', border: '1px solid #2e2f33', borderRadius: '8px' }}
@@ -161,7 +154,7 @@ function ChartCard({ title, data, dataKey, color, icon: Icon }: any) {
           <button
             key={filter}
             onClick={() => setActiveFilter(filter)}
-            className={`px-[12px] py-[4px] rounded-[6px] text-[12px] font-medium transition-colors cursor-pointer ${
+            className={`px-[12px] py-[4px] rounded-[6px] text-[12px] font-medium transition-colors ${
               activeFilter === filter ? 'bg-[#2e2f33] text-white' : 'text-[#717784] hover:text-[#99a0ae]'
             }`}
           >
@@ -264,13 +257,13 @@ function AutopilotTasksWidget({ pendingTasks }: { pendingTasks: typeof mockDashb
               <div className="flex items-center gap-[8px]">
                 <button 
                   onClick={() => handleSkip(task.id)}
-                  className="px-[12px] py-[6px] rounded-[6px] text-[12px] font-medium text-[#99a0ae] hover:text-white transition-colors cursor-pointer"
+                  className="px-[12px] py-[6px] rounded-[6px] text-[12px] font-medium text-[#99a0ae] hover:text-white transition-colors"
                 >
                   Skip
                 </button>
                 <button 
                   onClick={() => handleLog(task.id)}
-                  className="px-[12px] py-[6px] bg-[#2e2f33] rounded-[6px] text-[12px] font-medium text-white hover:bg-[#3e3f43] transition-colors cursor-pointer"
+                  className="px-[12px] py-[6px] bg-[#2e2f33] rounded-[6px] text-[12px] font-medium text-white hover:bg-[#3e3f43] transition-colors"
                 >
                   Log
                 </button>
@@ -281,10 +274,10 @@ function AutopilotTasksWidget({ pendingTasks }: { pendingTasks: typeof mockDashb
       </div>
 
       <div className="p-[16px] pt-0 flex gap-[12px]">
-         <button className="flex-1 py-[10px] text-center rounded-[8px] border border-[#2e2f33] text-[#717784] hover:text-white font-medium text-[14px] transition-colors cursor-pointer" onClick={() => console.log('Skip all')}>
+         <button className="flex-1 py-[10px] text-center rounded-[8px] border border-[#2e2f33] text-[#717784] hover:text-white font-medium text-[14px] transition-colors" onClick={() => console.log('Skip all')}>
            Skip All Today
          </button>
-         <button className="flex-1 py-[10px] text-center rounded-[8px] bg-[#065f46] border border-white/10 hover:bg-[#065f46]/90 text-white font-semibold font-['Inter_Tight',sans-serif] text-[14px] transition-colors cursor-pointer" onClick={() => console.log('Log all')}>
+         <button className="flex-1 py-[10px] text-center rounded-[8px] bg-[#065f46] border border-white/10 hover:bg-[#065f46]/90 text-white font-semibold font-['Inter_Tight',sans-serif] text-[14px] transition-colors" onClick={() => console.log('Log all')}>
            Log All Tasks
          </button>
       </div>
@@ -300,12 +293,12 @@ function NetWorthWidget({ data, investments }: { data: typeof mockDashboardData.
           <div className="w-[24px] h-[24px] bg-[#2e2f33] rounded-[6px] flex items-center justify-center">
             <Activity size={14} className="text-[#99a0ae]" />
           </div>
-          <h2 className="text-[16px] font-medium text-white font-['Inter_Tight',sans-serif] whitespace-nowrap">Net Worth</h2>
+          <h2 className="text-[16px] font-medium text-white font-['Inter_Tight',sans-serif]">Net Worth</h2>
         </div>
 
         <div className="h-[240px] w-full">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+            <AreaChart data={data} margin={{ top: 10, right: 0, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#40c4aa" stopOpacity={0.3}/>
@@ -314,14 +307,7 @@ function NetWorthWidget({ data, investments }: { data: typeof mockDashboardData.
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#2e2f33" vertical={false} />
               <XAxis dataKey="month" stroke="#717784" fontSize={12} tickLine={false} axisLine={false} />
-              <YAxis 
-                stroke="#717784" 
-                fontSize={12} 
-                tickLine={false} 
-                axisLine={false} 
-                tickFormatter={(val) => `${val/1000}k`}
-                width={45}
-              />
+              <YAxis stroke="#717784" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `LKR ${val/1000}k`} />
               <Tooltip 
                 contentStyle={{ backgroundColor: '#101214', border: '1px solid #2e2f33', borderRadius: '8px' }}
                 itemStyle={{ color: '#fff' }}

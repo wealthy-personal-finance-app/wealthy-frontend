@@ -33,7 +33,7 @@ export function TransactionRow({ transaction, onMenuClick }: TransactionRowProps
   const amountColor = isIncome ? '#40c4aa' : 'var(--destructive)';
 
   return (
-    /* Card row — bg + border overlay + rounded-[10px] Wealthy design system */
+    /* Card row — bg + border overlay + rounded-[10px] matching Figma TransactionRow */
     <div className="bg-[#191b1f] relative rounded-[10px] shrink-0 w-full">
       {/* Absolute border overlay so it sits on top */}
       <div
