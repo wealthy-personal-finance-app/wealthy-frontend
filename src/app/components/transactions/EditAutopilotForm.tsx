@@ -1,9 +1,37 @@
-import React, { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { ChevronDown, ChevronRight, Plus, Search, X } from 'lucide-react';
 import { AutopilotFlow, AutopilotIcon } from './AutopilotRow';
 import { CategoryIcon } from './CategoryIcon';
 import { toast } from 'sonner';
-import { initialExpenseCategories, initialIncomeCategories, initialAssetCategories, initialLiabilityCategories, CategoryData } from './AddTransactionModal';
+
+// Define CategoryData locally for this component
+export interface CategoryData {
+  id: string;
+  label: string;
+  icon: string;
+  masterCategory: string;
+  transactionType?: string;
+}
+
+// Helper to assign icons automatically
+function getIconForCategoryLabel(label: string): string {
+  const lower = label.toLowerCase();
+  if (lower.includes('hous') || lower.includes('rent')) return 'house';
+  if (lower.includes('food') || lower.includes('din')) return 'coffee';
+  if (lower.includes('transport') || lower.includes('car')) return 'bus';
+  if (lower.includes('util')) return 'zap';
+  if (lower.includes('debt') || lower.includes('card') || lower.includes('loan')) return 'credit-card';
+  if (lower.includes('insur')) return 'shield';
+  if (lower.includes('shop')) return 'shopping-cart';
+  if (lower.includes('salary') || lower.includes('wage')) return 'wallet';
+  if (lower.includes('stock') || lower.includes('invest')) return 'trending-up';
+  return 'star';
+}
+
+const fallbackMasterCategories = [
+  'Essential Living', 'Obligations & Liabilities', 'Discretionary & Lifestyle', 
+  'Growth & Giving', 'Earned Income', 'Passive Income', 'Liquid Assets', 'Investments'
+];
 
 function Toggle({ className, active = false }: { className?: string, active?: boolean }) {
   return (
@@ -13,7 +41,8 @@ function Toggle({ className, active = false }: { className?: string, active?: bo
   );
 }
 
-export function EditAutopilotForm({ flow, onClose }: { flow: AutopilotFlow, onClose?: () => void }) {
+// NOTE: Added onRefresh prop here!
+export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: AutopilotFlow, onClose?: () => void, onRefresh?: () => void }) {
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [isDayOpen, setIsDayOpen] = useState(false);
@@ -24,10 +53,9 @@ export function EditAutopilotForm({ flow, onClose }: { flow: AutopilotFlow, onCl
     setIsScheduleOpen(dropdown === 'schedule' ? !isScheduleOpen : false);
     setIsDayOpen(dropdown === 'day' ? !isDayOpen : false);
     setIsMonthOpen(dropdown === 'month' ? !isMonthOpen : false);
-    if (dropdown === 'category' && !isCategoryOpen) {
-      setCategoryViewState('list');
-    }
+    if (dropdown === 'category' && !isCategoryOpen) setCategoryViewState('list');
   };
+
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryViewState, setCategoryViewState] = useState<'list' | 'assign-master'>('list');
   const [newCategoryLabel, setNewCategoryLabel] = useState('');
@@ -37,99 +65,193 @@ export function EditAutopilotForm({ flow, onClose }: { flow: AutopilotFlow, onCl
   const dayRef = useRef<HTMLDivElement>(null);
   const monthRef = useRef<HTMLDivElement>(null);
 
+  // Click outside listener
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (isCategoryOpen && categoryRef.current && !categoryRef.current.contains(event.target as Node)) {
-        setIsCategoryOpen(false);
-      }
-      if (isScheduleOpen && scheduleRef.current && !scheduleRef.current.contains(event.target as Node)) {
-        setIsScheduleOpen(false);
-      }
-      if (isDayOpen && dayRef.current && !dayRef.current.contains(event.target as Node)) {
-        setIsDayOpen(false);
-      }
-      if (isMonthOpen && monthRef.current && !monthRef.current.contains(event.target as Node)) {
-        setIsMonthOpen(false);
-      }
+      if (isCategoryOpen && categoryRef.current && !categoryRef.current.contains(event.target as Node)) setIsCategoryOpen(false);
+      if (isScheduleOpen && scheduleRef.current && !scheduleRef.current.contains(event.target as Node)) setIsScheduleOpen(false);
+      if (isDayOpen && dayRef.current && !dayRef.current.contains(event.target as Node)) setIsDayOpen(false);
+      if (isMonthOpen && monthRef.current && !monthRef.current.contains(event.target as Node)) setIsMonthOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isCategoryOpen, isScheduleOpen, isDayOpen, isMonthOpen]);
 
-
-
+  // Form State
   const [formData, setFormData] = useState({
     flowName: flow.title,
     amount: flow.amount.toString(),
     type: flow.type.charAt(0).toUpperCase() + flow.type.slice(1),
-    category: 'Housing',
-    schedule: 'Daily',
-    onDay: '1st day of the month',
+    category: flow.category || 'Housing',
+    schedule: flow.schedule?.includes('month') ? 'Monthly' : 
+              flow.schedule?.includes('Every') && !flow.schedule?.includes('Day') ? 'Weekly' : 
+              flow.schedule === 'Every Day' ? 'Daily' : 'Yearly',
+    onDay: flow.schedule || '1st day of the month',
     onMonth: 'January',
     selectedDays: ['Sun'],
     note: ''
   });
 
-  const handleSave = () => {
-    const payload = { ...formData };
-    console.log('Saved changes:', JSON.stringify(payload, null, 2));
-    toast.success(`Changes to "${formData.flowName}" saved successfully`);
-    onClose?.();
-  };
+  // DB Category States
+  const [allExpenseCats, setAllExpenseCats] = useState<CategoryData[]>([]);
+  const [allIncomeCats, setAllIncomeCats] = useState<CategoryData[]>([]);
+  const [allAssetCats, setAllAssetCats] = useState<CategoryData[]>([]);
+  const [allLiabilityCats, setAllLiabilityCats] = useState<CategoryData[]>([]);
 
-  const handleDelete = () => {
-    console.log('Delete this Autopilot clicked');
-    toast.error(`Autopilot flow deleted`);
-    onClose?.();
-  };
+  // 1. --- GET CATEGORIES FROM DATABASE ---
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const token = localStorage.getItem('wealthy_token');
+        const res = await fetch('http://localhost:5000/api/transactions/categories', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const result = await res.json();
+          const nestedData = result.data || {};
 
-  const types = ['Expense', 'Income', 'Asset', 'Liability'];
-  const schedules = ['Daily', 'Weekly', 'Monthly', 'Yearly'];
-  const categories = ['Housing', 'Food & Dining', 'Transportation', 'Shopping', 'Income'];
-  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
-  const [allExpenseCats, setAllExpenseCats] = useState(initialExpenseCategories);
-  const [allIncomeCats, setAllIncomeCats] = useState(initialIncomeCategories);
-  const [allAssetCats, setAllAssetCats] = useState(initialAssetCategories);
-  const [allLiabilityCats, setAllLiabilityCats] = useState(initialLiabilityCategories);
+          const flatten = (typeKey: string): CategoryData[] => {
+            const flatList: CategoryData[] = [];
+            if (nestedData[typeKey]) {
+              Object.keys(nestedData[typeKey]).forEach((masterCat) => {
+                const subCats = nestedData[typeKey][masterCat];
+                if (Array.isArray(subCats)) {
+                  subCats.forEach((sub: string) => flatList.push({
+                    id: sub.toLowerCase().replace(/\s+/g, '-'),
+                    label: sub,
+                    icon: getIconForCategoryLabel(sub),
+                    masterCategory: masterCat,
+                    transactionType: typeKey
+                  }));
+                }
+              });
+            }
+            return flatList;
+          };
+          setAllExpenseCats(flatten('expense'));
+          setAllIncomeCats(flatten('income'));
+          setAllAssetCats(flatten('asset'));
+          setAllLiabilityCats(flatten('liability'));
+        }
+      } catch (error) { console.error(error); }
+    };
+    fetchCategories();
+  }, []);
 
   const currentCategories =
     formData.type === 'Expense' ? allExpenseCats :
-      formData.type === 'Income' ? allIncomeCats :
-        formData.type === 'Asset' ? allAssetCats :
-          allLiabilityCats;
+    formData.type === 'Income' ? allIncomeCats :
+    formData.type === 'Asset' ? allAssetCats : allLiabilityCats;
 
-  const masterCategoryOptions = Array.from(new Set(currentCategories.map(c => c.masterCategory)));
-
+  const dynamicMasterCategories = Array.from(new Set(currentCategories.map(c => c.masterCategory)));
+  const masterCategoryOptions = dynamicMasterCategories.length > 0 ? dynamicMasterCategories : fallbackMasterCategories;
+  
   const filteredCategories = currentCategories.filter(c => c.label.toLowerCase().includes(searchQuery.toLowerCase()));
-
   const groupedCategories = filteredCategories.reduce((acc, cat) => {
     if (!acc[cat.masterCategory]) acc[cat.masterCategory] = [];
     acc[cat.masterCategory].push(cat);
     return acc;
   }, {} as Record<string, CategoryData[]>);
 
-  const handleCreateCategory = (masterCat: string) => {
-    const newCat: CategoryData = {
-      id: newCategoryLabel.toLowerCase().replace(/\s+/g, '-'),
-      label: newCategoryLabel,
-      icon: 'star',
+  // 2. --- POST NEW CATEGORY TO DATABASE ---
+  const handleCreateCategory = async (masterCat: string) => {
+    const label = newCategoryLabel || searchQuery;
+    if (!label) return;
+
+    const payload = {
+      transactionType: formData.type.toLowerCase(),
+      label: label,
+      icon: getIconForCategoryLabel(label),
       masterCategory: masterCat
     };
 
-    if (formData.type === 'Expense') setAllExpenseCats([...allExpenseCats, newCat]);
-    else if (formData.type === 'Income') setAllIncomeCats([...allIncomeCats, newCat]);
-    else if (formData.type === 'Asset') setAllAssetCats([...allAssetCats, newCat]);
-    else setAllLiabilityCats([...allLiabilityCats, newCat]);
+    try {
+      const token = localStorage.getItem('wealthy_token');
+      const res = await fetch('http://localhost:5000/api/transactions/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(payload)
+      });
 
-    setFormData({ ...formData, category: newCategoryLabel });
-    setIsCategoryOpen(false);
-    setCategoryViewState('list');
-    setSearchQuery('');
+      if (res.ok) {
+        const newCat: CategoryData = { id: label.toLowerCase(), label, icon: payload.icon, masterCategory: masterCat };
+        if (formData.type === 'Expense') setAllExpenseCats([...allExpenseCats, newCat]);
+        else if (formData.type === 'Income') setAllIncomeCats([...allIncomeCats, newCat]);
+        else if (formData.type === 'Asset') setAllAssetCats([...allAssetCats, newCat]);
+        else setAllLiabilityCats([...allLiabilityCats, newCat]);
 
-    toast.success(`Category "${newCategoryLabel}" created in ${masterCat}`);
+        setFormData({ ...formData, category: label });
+        setIsCategoryOpen(false);
+        setCategoryViewState('list');
+        setSearchQuery('');
+        toast.success(`Category "${label}" created!`);
+      } else {
+        toast.error("Failed to save category to DB");
+      }
+    } catch (error) { console.error(error); }
   };
 
+  // 3. --- PATCH AUTOPILOT FLOW ---
+  const handleSave = async () => {
+    try {
+      const token = localStorage.getItem('wealthy_token');
+      const selectedCat = currentCategories.find(c => c.label === formData.category);
+
+      let scheduledDayString = formData.onDay;
+      if (formData.schedule === 'Weekly') scheduledDayString = formData.selectedDays.join(', ');
+      if (formData.schedule === 'Daily') scheduledDayString = 'Every Day';
+      if (formData.schedule === 'Yearly') scheduledDayString = `${formData.onMonth} ${formData.onDay}`;
+
+      const payload = {
+        flowName: formData.flowName,
+        amount: Number(formData.amount),
+        type: formData.type.toLowerCase(),
+        parentCategory: selectedCat?.masterCategory || 'Uncategorized',
+        subCategory: formData.category,
+        frequency: formData.schedule.toLowerCase(),
+        scheduledDay: scheduledDayString,
+        note: formData.note
+      };
+
+      const res = await fetch(`http://localhost:5000/api/transactions/autopilot/${flow.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        toast.success(`Changes to "${formData.flowName}" saved!`);
+        onRefresh?.(); // Tell the app to reload
+        onClose?.();
+      } else {
+        toast.error("Failed to update Autopilot flow.");
+      }
+    } catch (error) { console.error(error); }
+  };
+
+  // 4. --- DELETE AUTOPILOT FLOW ---
+  const handleDelete = async () => {
+    if (!window.confirm("Are you sure you want to delete this flow?")) return;
+    try {
+      const token = localStorage.getItem('wealthy_token');
+      const res = await fetch(`http://localhost:5000/api/transactions/autopilot/${flow.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        toast.error(`Autopilot flow deleted`);
+        onRefresh?.(); // Tell the app to reload
+        onClose?.();
+      } else {
+        toast.error("Failed to delete flow");
+      }
+    } catch (error) { console.error(error); }
+  };
+
+  const types = ['Expense', 'Income', 'Asset', 'Liability'];
+  const schedules = ['Daily', 'Weekly', 'Monthly', 'Yearly'];
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
   return (
     <div className="bg-[#191b1f] border border-[#2e2f33] border-solid content-stretch flex flex-col gap-[0px] items-start justify-center px-[17px] py-[13px] relative rounded-[10px] w-full">
@@ -151,13 +273,13 @@ export function EditAutopilotForm({ flow, onClose }: { flow: AutopilotFlow, onCl
                   <ChevronDown size={14} color="#99a0ae" />
                 </div>
                 <p className="font-['Inter_Tight',sans-serif] font-normal leading-[16px] not-italic relative shrink-0 text-[#94a3b8] text-[12px] whitespace-nowrap">
-                  1st of every month
+                  {formData.schedule}
                 </p>
               </div>
               <p className="font-['Inter_Tight',sans-serif] font-semibold leading-[18px] not-italic relative shrink-0 text-[14px] text-[#df1c41] whitespace-nowrap">
-                -LKR {Number(formData.amount || 0).toLocaleString()}
+                LKR {Number(formData.amount || 0).toLocaleString()}
               </p>
-              <Toggle active className="bg-[#065f46] content-stretch flex h-[20px] items-center justify-end p-[2px] relative rounded-[999px] shrink-0 w-[35px]" />
+              <Toggle active={flow.enabled} className="bg-[#065f46] content-stretch flex h-[20px] items-center justify-end p-[2px] relative rounded-[999px] shrink-0 w-[35px]" />
             </div>
           </div>
 
@@ -217,7 +339,7 @@ export function EditAutopilotForm({ flow, onClose }: { flow: AutopilotFlow, onCl
                       key={t}
                       onClick={() => {
                         const newCatList = t === 'Expense' ? allExpenseCats : t === 'Income' ? allIncomeCats : t === 'Asset' ? allAssetCats : allLiabilityCats;
-                        setFormData({ ...formData, type: t, category: newCatList[0].label });
+                        setFormData({ ...formData, type: t, category: newCatList.length > 0 ? newCatList[0].label : 'General' });
                       }}
                       className={`content-stretch flex flex-[1_0_0] gap-[8px] items-center justify-center min-h-px min-w-px px-[24px] py-[4px] relative rounded-[8px] cursor-pointer transition-all ${formData.type === t
                           ? 'bg-[rgba(65,63,63,0.5)] shadow-[0px_1px_6px_0px_rgba(14,18,27,0.08)]'
@@ -242,7 +364,7 @@ export function EditAutopilotForm({ flow, onClose }: { flow: AutopilotFlow, onCl
                     onClick={() => toggleDropdown('category')}
                     className={`bg-[#141414] border-[1px] border-[#2e2f33] border-solid content-stretch flex gap-[12px] items-center overflow-clip px-[12px] py-[8px] relative ${isCategoryOpen ? 'rounded-t-[8px] rounded-b-none' : 'rounded-[8px]'} shrink-0 w-full focus-within:border-[#99a0ae] transition-colors cursor-pointer`}
                   >
-                    <span className="flex-[1_0_0] font-['Inter_Tight',sans-serif] font-normal leading-[18px] text-[14px] text-[#717784]">
+                    <span className="flex-[1_0_0] font-['Inter_Tight',sans-serif] font-normal leading-[18px] text-[14px] text-[#717784] truncate">
                       {formData.category}
                     </span>
                     <div className="overflow-clip relative shrink-0 size-[20px] pointer-events-none">

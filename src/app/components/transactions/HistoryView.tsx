@@ -16,6 +16,10 @@ interface HistoryViewProps {
   onSearchChange?: (query: string) => void;
   onTransactionMenuClick?: (transactionId: string) => void;
   onFilterChange?: (filters: FilterState) => void;
+  
+  // ADDED: The new backend functions
+  onUpdateTransaction?: (id: string, data: any) => void;
+  onDeleteTransaction?: (id: string) => void;
 }
 
 /** Search magnifier — path p31d7be00 from svg-pq2oaob5wk */
@@ -47,6 +51,10 @@ export function HistoryView({
   onSearchChange,
   onTransactionMenuClick,
   onFilterChange,
+  
+  // ADDED: Destructure them here
+  onUpdateTransaction,
+  onDeleteTransaction
 }: HistoryViewProps) {
   return (
     <div className="flex flex-col h-full">
@@ -176,6 +184,10 @@ export function HistoryView({
                       key={transaction.id}
                       transaction={transaction}
                       onMenuClick={onTransactionMenuClick}
+                      
+                      // ADDED: Pass them down to the row!
+                      onUpdate={onUpdateTransaction}
+                      onDelete={onDeleteTransaction}
                     />
                   ))}
                 </div>

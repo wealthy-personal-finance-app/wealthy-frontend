@@ -29,6 +29,7 @@ createRoot(document.getElementById("root")!).render(
       <Route path="/ai-assistant" element={<App />} />
       <Route path="/cash-flow" element={<App />} />
       <Route path="/transactions" element={<App />} />
+      <Route path="/dashboard" element={<App />} />
       <Route path="/*" element={<App />} />
       <Route path="/" element={<Navigate to="/sign-in" replace />} />
     </Routes>
