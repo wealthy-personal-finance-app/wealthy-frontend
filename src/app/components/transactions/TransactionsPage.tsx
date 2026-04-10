@@ -118,7 +118,7 @@ export function TransactionsPage({
       <div className="relative shrink-0 w-full">
         <div className="flex flex-col gap-[16px] items-start px-[32px] pt-[16px] pb-[16px] relative w-full">
 
-          {/* Heading — 20px / 500 weight Wealthy design system */}
+          {/* Heading — 20px / 500 weight matching Figma */}
           <p
             style={{
               fontFamily: 'var(--font-family)',
@@ -132,7 +132,7 @@ export function TransactionsPage({
             Transactions
           </p>
 
-          {/* Tab Toggle — Switch Toggle style from Wealthy design system */}
+          {/* Tab Toggle — Switch Toggle style from Figma */}
           <div className="bg-[#191b1f] relative rounded-[12px] shrink-0">
             {/* Outer border ring */}
             <div

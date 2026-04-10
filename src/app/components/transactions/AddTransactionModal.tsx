@@ -11,7 +11,7 @@ export interface CategoryData {
   masterCategory: string;
 }
 
-export const initialExpenseCategories: CategoryData[] = [
+const initialExpenseCategories: CategoryData[] = [
   { id: 'housing', label: 'Housing', icon: 'house', masterCategory: 'Essential Living' },
   { id: 'food', label: 'Food & Dining', icon: 'coffee', masterCategory: 'Essential Living' },
   { id: 'transportation', label: 'Transportation', icon: 'bus', masterCategory: 'Essential Living' },
@@ -29,7 +29,7 @@ export const initialExpenseCategories: CategoryData[] = [
   { id: 'misc', label: 'Miscellaneous', icon: 'more-horizontal', masterCategory: 'Unplanned' }
 ];
 
-export const initialIncomeCategories: CategoryData[] = [
+const initialIncomeCategories: CategoryData[] = [
   { id: 'salary', label: 'Salary/Wages', icon: 'wallet', masterCategory: 'Earned Income' },
   { id: 'bonus', label: 'Bonuses & Commissions', icon: 'award', masterCategory: 'Earned Income' },
   { id: 'freelance', label: 'Freelance/Side Hustle', icon: 'briefcase', masterCategory: 'Earned Income' },
@@ -40,7 +40,7 @@ export const initialIncomeCategories: CategoryData[] = [
   { id: 'refunds', label: 'Refunds/Reimbursements', icon: 'refresh-ccw', masterCategory: 'Other Income' }
 ];
 
-export const initialAssetCategories: CategoryData[] = [
+const initialAssetCategories: CategoryData[] = [
   { id: 'cash', label: 'Cash & Equivalents', icon: 'dollar-sign', masterCategory: 'Liquid Assets' },
   { id: 'bank', label: 'Bank Accounts', icon: 'landmark', masterCategory: 'Liquid Assets' },
   { id: 'stocks', label: 'Stocks', icon: 'trending-up', masterCategory: 'Investments' },
@@ -50,7 +50,7 @@ export const initialAssetCategories: CategoryData[] = [
   { id: 'vehicles', label: 'Vehicles', icon: 'car', masterCategory: 'Personal Property' }
 ];
 
-export const initialLiabilityCategories: CategoryData[] = [
+const initialLiabilityCategories: CategoryData[] = [
   { id: 'credit-cards', label: 'Credit Cards', icon: 'credit-card', masterCategory: 'Short-Term Liabilities' },
   { id: 'personal-loans', label: 'Personal Loans', icon: 'file-text', masterCategory: 'Short-Term Liabilities' },
   { id: 'mortgages', label: 'Mortgages', icon: 'home', masterCategory: 'Long-Term Liabilities' },
@@ -58,6 +58,13 @@ export const initialLiabilityCategories: CategoryData[] = [
   { id: 'auto-loans', label: 'Auto Loans', icon: 'car', masterCategory: 'Long-Term Liabilities' }
 ];
 
+const masterCategoryOptions = [
+  'Essential Living',
+  'Obligations & Liabilities',
+  'Discretionary & Lifestyle',
+  'Growth & Giving',
+  'Unplanned'
+];
 
 type AllowedTypes = 'Expense' | 'Income' | 'Asset' | 'Liability';
 
@@ -141,8 +148,6 @@ export function AddTransactionModal({ onClose, onSave }: AddTransactionModalProp
       transactionType === 'Income' ? allIncomeCats :
         transactionType === 'Asset' ? allAssetCats :
           allLiabilityCats;
-
-  const masterCategoryOptions = Array.from(new Set(currentCategories.map(c => c.masterCategory)));
 
   // Filter Categories
   const filteredCategories = currentCategories.filter(c =>

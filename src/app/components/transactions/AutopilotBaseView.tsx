@@ -22,7 +22,7 @@ function PlusIcon() {
       <div className="absolute inset-[8.33%]">
         <div className="absolute inset-[-4.55%]">
           <svg className="block size-full" fill="none" preserveAspectRatio="none" viewBox="0 0 18 18">
-            <path d="M9 3V15M3 9H15" fill="none" stroke="#FFFFFF" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
+            <path d={svgPaths.p253fc100} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
           </svg>
         </div>
       </div>
@@ -81,7 +81,7 @@ export function AutopilotBaseView({
           className="bg-[#191b1f] hover:bg-[#1f2220] transition-colors rounded-[8px] flex items-center gap-[4px] px-[12px] py-[8px] cursor-pointer shrink-0"
           style={{ border: '1px solid #2e2f33' }}
         >
-          <PlusIcon />
+          <ChevronRightIcon />
           <span style={{ fontFamily: 'var(--font-family)', fontSize: '16px', lineHeight: '24px', fontWeight: 500, color: 'white' }}>
             New Autopilot Flow
           </span>

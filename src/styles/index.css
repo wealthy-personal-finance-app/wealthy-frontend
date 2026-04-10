@@ -2,23 +2,24 @@
 @import './tailwind.css';
 @import './theme.css';
 
-/* Global Scrollbar Hiding - Seamless Scrolling */
+/* Global Custom Scrollbar - Premium Dark Mode Aesthetic */
 ::-webkit-scrollbar {
-  display: none !important;
+  width: 8px;
+  height: 8px;
 }
 
-* {
-  -ms-overflow-style: none !important;  /* IE and Edge */
-  scrollbar-width: none !important;  /* Firefox */
+::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-/* Scrollbar Hide Utility */
-.scrollbar-hide::-webkit-scrollbar {
-  display: none !important;
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  transition: background 0.2s ease;
 }
-.scrollbar-hide {
-  -ms-overflow-style: none !important;
-  scrollbar-width: none !important;
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 /* Utility classes for design system typography */

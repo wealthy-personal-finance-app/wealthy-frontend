@@ -31,7 +31,7 @@ const CATEGORY_HIERARCHY = {
   'Growth & Giving': ['Savings', 'Investments', 'Donations', 'Education'],
 };
 
-// ===== ICON COMPONENTS (Wealthy design system) =====
+// ===== ICON COMPONENTS (Matching Figma exactly) =====
 function CreditCardIcon() {
   return (
     <div className="overflow-clip relative shrink-0 size-[20px]">

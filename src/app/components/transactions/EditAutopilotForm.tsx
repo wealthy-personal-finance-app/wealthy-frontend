@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { ChevronDown, Search, Plus, ChevronRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { AutopilotFlow, AutopilotIcon } from './AutopilotRow';
 import { CategoryIcon } from './CategoryIcon';
 import { toast } from 'sonner';
@@ -85,6 +85,7 @@ export function EditAutopilotForm({ flow, onClose }: { flow: AutopilotFlow, onCl
 
   const types = ['Expense', 'Income', 'Asset', 'Liability'];
   const schedules = ['Daily', 'Weekly', 'Monthly', 'Yearly'];
+  const categories = ['Housing', 'Food & Dining', 'Transportation', 'Shopping', 'Income'];
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
   const [allExpenseCats, setAllExpenseCats] = useState(initialExpenseCategories);
@@ -385,7 +386,7 @@ export function EditAutopilotForm({ flow, onClose }: { flow: AutopilotFlow, onCl
                   </div>
 
                   {isScheduleOpen && (
-                    <div className="absolute top-full left-0 right-0 z-50 bg-[#15161a] border border-[#2e2f33] border-solid border-t-0 flex flex-col items-start overflow-clip p-[16px] rounded-b-[16px] shadow-[0px_10px_100px_0px_rgba(10,10,57,0.15)] animate-in fade-in slide-in-from-top-1 duration-200">
+                    <div className="absolute top-full left-0 right-0 z-50 bg-[#15161a] border border-[#2e2f33] border-solid border-t-0 flex flex-col items-start overflow-clip p-[16px] rounded-b-[16px] shadow-[0px_10px_100px_0px_rgba(10,10,57,0.15)]">
                       <div className="flex flex-col gap-[6px] items-start w-full">
                         {schedules.map((s, index) => (
                           <React.Fragment key={s}>
@@ -558,7 +559,7 @@ export function EditAutopilotForm({ flow, onClose }: { flow: AutopilotFlow, onCl
                     </div>
 
                     {isMonthOpen && (
-                      <div className="absolute top-full left-0 right-0 z-50 bg-[#15161a] border border-[#2e2f33] border-solid border-t-0 flex flex-col items-start overflow-y-auto max-h-[250px] p-[16px] rounded-b-[16px] shadow-[0px_10px_100px_0px_rgba(10,10,57,0.15)] scrollbar-hide animate-in fade-in slide-in-from-top-1 duration-200">
+                      <div className="absolute top-full left-0 right-0 z-50 bg-[#15161a] border border-[#2e2f33] border-solid border-t-0 flex flex-col items-start overflow-y-auto max-h-[250px] p-[16px] rounded-b-[16px] shadow-[0px_10px_100px_0px_rgba(10,10,57,0.15)] scrollbar-hide">
                         <div className="flex flex-col gap-[6px] items-start w-full">
                           {months.map((m, index) => (
                             <React.Fragment key={m}>
