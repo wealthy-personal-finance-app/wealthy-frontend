@@ -10,9 +10,10 @@ import {AddNewAutopilotDrawer} from "./components/transactions/AddNewAutopilotDr
 import {Dashboard} from "./components/dashboard/Dashboard"
 import {ChatLink} from "./components/layout/Sidebar"
 import {CashflowPage} from "./components/cashflow/CashflowPage"
+import {PlanSelection} from "./components/profile/PlanSelection"
 import {toast} from "sonner"
 
-// Mock data - replace with API calls
+// --- Helper Functions to Format MongoDB Data for UI ---
 function getIconForCategory(subCategory: string): string {
   const cat = (subCategory || "").toLowerCase()
   if (
@@ -258,6 +259,7 @@ function parseChatLinks(payload: unknown): ChatLink[] {
     })
     .filter((value): value is ChatLink => Boolean(value))
 }
+
 export default function App() {
   const [activeSidebarLink, setActiveSidebarLink] = useState("transactions")
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false)
@@ -348,14 +350,6 @@ export default function App() {
 
   const handleUserMenuClick = () => {
     console.log("User menu clicked")
-  }
-
-  const handleTransactionMenuClick = (transactionId: string) => {
-    console.log("Transaction menu clicked:", transactionId)
-  }
-
-  const handleNewAutopilotFlowClick = () => {
-    console.log("New autopilot flow clicked")
   }
 
   // Fetch BOTH Transactions & Autopilot Flows
@@ -553,6 +547,8 @@ export default function App() {
         <Dashboard />
       ) : activeSidebarLink === "cash-flow" ? (
         <CashflowPage />
+      ) : activeSidebarLink === "settings" ? (
+        <PlanSelection />
       ) : (
         <TransactionsPage
           transactionGroups={transactionGroups}
