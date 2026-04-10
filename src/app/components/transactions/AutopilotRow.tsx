@@ -8,7 +8,8 @@ export interface AutopilotFlow {
   title: string;
   schedule: string;
   amount: number;
-  type: 'income' | 'expense';
+  type: 'income' | 'expense' | 'asset' | 'liability';
+  category: string;
   icon: string;
   enabled: boolean;
 }
@@ -18,6 +19,7 @@ interface AutopilotRowProps {
   onToggle?: (flowId: string, enabled: boolean) => void;
   onClick?: (flowId: string) => void;
   isExpanded?: boolean;
+  onAutopilotRefresh?: () => void; // <--- ADDED PROP
 }
 
 export function AutopilotIcon({ icon }: { icon: string }) {
@@ -44,7 +46,7 @@ function ChevronRightIcon() {
   );
 }
 
-export function AutopilotRow({ flow, onToggle, onClick, isExpanded }: AutopilotRowProps) {
+export function AutopilotRow({ flow, onToggle, onClick, isExpanded, onAutopilotRefresh }: AutopilotRowProps) {
   const [isEnabled, setIsEnabled] = useState(flow.enabled);
 
   const handleToggle = (e: React.MouseEvent) => {
@@ -63,6 +65,7 @@ export function AutopilotRow({ flow, onToggle, onClick, isExpanded }: AutopilotR
       <EditAutopilotForm 
         flow={flow} 
         onClose={() => onClick?.(flow.id)} 
+        onRefresh={onAutopilotRefresh} // <--- PASSED TO FORM
       />
     );
   }
