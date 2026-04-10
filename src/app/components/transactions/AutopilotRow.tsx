@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import svgPaths from "../../../imports/TransactionsAutopilotBase-1/svg-l3wrwsdhjj";
 import { EditAutopilotForm } from './EditAutopilotForm';
+import { CategoryIcon } from './CategoryIcon';
 
 export interface AutopilotFlow {
   id: string;
@@ -8,7 +9,7 @@ export interface AutopilotFlow {
   schedule: string;
   amount: number;
   type: 'income' | 'expense';
-  icon: 'home' | 'receipt' | 'wallet' | 'car' | 'shopping' | 'coffee' | string;
+  icon: string;
   enabled: boolean;
 }
 
@@ -22,86 +23,11 @@ interface AutopilotRowProps {
 export function AutopilotIcon({ icon }: { icon: string }) {
   const containerClass = "bg-[rgba(65,63,63,0.5)] flex items-center justify-center size-[40px] rounded-[10px]";
   
-  switch (icon) {
-    case 'home':
-      return (
-        <div className={containerClass}>
-          <div className="overflow-clip relative shrink-0 size-[20px]">
-            <div className="absolute inset-[11.35%_10%_11.22%_8.68%]">
-              <svg className="absolute block size-full" fill="none" preserveAspectRatio="none" viewBox="0 0 16.2653 15.4844">
-                <path d={svgPaths.p17d49680} fill="#99A0AE" />
-              </svg>
-            </div>
-          </div>
-        </div>
-      );
-    case 'receipt':
-      return (
-        <div className={containerClass}>
-          <div className="overflow-clip relative shrink-0 size-[20px]">
-            <div className="-translate-x-1/2 -translate-y-1/2 absolute left-1/2 top-1/2 size-[15.5px]">
-              <svg className="absolute block size-full" fill="none" preserveAspectRatio="none" viewBox="0 0 17.4167 17.4167">
-                <path d={svgPaths.p2a1c1980} stroke="#99A0AE" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
-              </svg>
-            </div>
-          </div>
-        </div>
-      );
-    case 'wallet':
-      return (
-        <div className={containerClass}>
-          <div className="overflow-clip relative shrink-0 size-[20px]">
-            <div className="-translate-x-1/2 -translate-y-1/2 absolute left-1/2 top-1/2 size-[15.5px]">
-              <svg className="absolute block size-full" fill="none" preserveAspectRatio="none" viewBox="0 0 19.3333 19.3333">
-                <path d={svgPaths.p27e46b80} stroke="#99A0AE" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
-              </svg>
-            </div>
-          </div>
-        </div>
-      );
-    case 'car':
-      return (
-        <div className={containerClass}>
-          <div className="overflow-clip relative shrink-0 size-[20px]">
-            <div className="-translate-x-1/2 -translate-y-1/2 absolute left-1/2 top-1/2 size-[15.5px]">
-              <svg className="absolute block size-full" fill="none" preserveAspectRatio="none" viewBox="0 0 19.3333 19.3333">
-                <path d={svgPaths.p1a394f80} stroke="#99A0AE" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
-              </svg>
-            </div>
-          </div>
-        </div>
-      );
-    case 'shopping':
-      return (
-        <div className={containerClass}>
-          <div className="overflow-clip relative shrink-0 size-[20px]">
-            <div className="-translate-x-1/2 -translate-y-1/2 absolute left-1/2 top-1/2 size-[14.5px]">
-              <svg className="absolute block size-full" fill="none" preserveAspectRatio="none" viewBox="0 0 18.1667 18.1667">
-                <path d={svgPaths.p2f4e8400} stroke="#99A0AE" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
-              </svg>
-            </div>
-          </div>
-        </div>
-      );
-    case 'coffee':
-      return (
-        <div className={containerClass}>
-          <div className="overflow-clip relative shrink-0 size-[20px]">
-            <div className="-translate-x-1/2 -translate-y-1/2 absolute left-1/2 top-1/2 size-[15.5px]">
-              <svg className="absolute block size-full" fill="none" preserveAspectRatio="none" viewBox="0 0 17.4167 17.4167">
-                <path d={svgPaths.p18ca1580} stroke="#99A0AE" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
-              </svg>
-            </div>
-          </div>
-        </div>
-      );
-    default:
-      return (
-        <div className={containerClass}>
-          <div className="w-[20px] h-[20px] bg-[#717784] rounded-full" />
-        </div>
-      );
-  }
+  return (
+    <div className={containerClass}>
+      <CategoryIcon icon={icon} size={20} color="#99a0ae" />
+    </div>
+  );
 }
 
 function ChevronRightIcon() {

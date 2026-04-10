@@ -1,0 +1,28 @@
+{
+  "nodes": [
+    { "id": "Active Income", "color": "#22C55E", "cluster": "income" },
+    { "id": "Asset Income", "color": "#22C55E", "cluster": "income" },
+    { "id": "Other Income", "color": "#22C55E", "cluster": "income" },
+    { "id": "Total Cash Flow", "color": "#5A6B89", "cluster": "hub" },
+    { "id": "Essential Living", "color": "#F43F5E", "cluster": "expenses" },
+    { "id": "Obligations & Liabilities", "color": "#F43F5E", "cluster": "expenses" },
+    { "id": "Discretionary & Lifestyle", "color": "#F43F5E", "cluster": "expenses" },
+    { "id": "Growth & Giving", "color": "#10B981", "cluster": "wealth" },
+    { "id": "Unplanned", "color": "#4B5563", "cluster": "wealth" }
+  ],
+  "links": [
+    { "source": "Active Income", "target": "Total Cash Flow", "value": 120000 },
+    { "source": "Asset Income", "target": "Total Cash Flow", "value": 35000 },
+    { "source": "Other Income", "target": "Total Cash Flow", "value": 13000 },
+    { "source": "Total Cash Flow", "target": "Essential Living", "value": 65000 },
+    { "source": "Total Cash Flow", "target": "Obligations & Liabilities", "value": 42000 },
+    { "source": "Total Cash Flow", "target": "Discretionary & Lifestyle", "value": 28000 },
+    { "source": "Total Cash Flow", "target": "Growth & Giving", "value": 23000 },
+    { "source": "Total Cash Flow", "target": "Unplanned", "value": 10000 }
+  ],
+  "summary": {
+    "totalIn": 168000,
+    "totalOut": 135000,
+    "netFlow": 33000
+  }
+}
