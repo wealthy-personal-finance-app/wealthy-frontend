@@ -201,7 +201,7 @@ export function CashflowPage() {
         {/* Card Header */}
         <div className="flex justify-between items-center mb-[40px] shrink-0">
           <div className="flex flex-col gap-[8px]">
-            {/* breadcrumb */}
+            {/* Breadcrumb */}
             {isDetailView && (
               <button
                 onClick={handleBackToOverview}
