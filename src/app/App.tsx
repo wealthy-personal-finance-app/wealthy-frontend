@@ -1,3 +1,20 @@
+<<<<<<< feature/thusitha/frontend-foundation
+import { useState, useEffect } from 'react';
+import { MainLayout } from './components/layout/MainLayout';
+import { TransactionsPage } from './components/transactions/TransactionsPage';
+import { AIAssistantPage } from './components/ai-assistant/AIAssistantPage';
+import { TransactionGroup } from './components/transactions/HistoryView';
+import { AutopilotFlowGroup } from './components/transactions/AutopilotBaseView';
+import { FilterState } from './components/transactions/FilterMenu';
+import { AddTransactionModal } from './components/transactions/AddTransactionModal';
+import { AddNewAutopilotDrawer } from './components/transactions/AddNewAutopilotDrawer';
+import { Dashboard } from './components/dashboard/Dashboard';
+import { CashflowPage } from './components/cashflow/CashflowPage';
+import { ProfileSettings } from './components/profile/ProfileSettings';
+import { PlanSelection } from './components/profile/PlanSelection';
+import { AppSettings } from './components/settings/AppSettings';
+import { toast } from 'sonner';
+=======
 import {useState, useEffect, useCallback} from "react"
 import {MainLayout} from "./components/layout/MainLayout"
 import {TransactionsPage} from "./components/transactions/TransactionsPage"
@@ -11,6 +28,7 @@ import {Dashboard} from "./components/dashboard/Dashboard"
 import {ChatLink} from "./components/layout/Sidebar"
 import {CashflowPage} from "./components/cashflow/CashflowPage"
 import {toast} from "sonner"
+>>>>>>> master
 
 // Mock data - replace with API calls
 function getIconForCategory(subCategory: string): string {
@@ -227,6 +245,29 @@ function parseChatLinks(payload: unknown): ChatLink[] {
   const list = candidates.find((candidate) => Array.isArray(candidate))
   if (!Array.isArray(list)) return []
 
+<<<<<<< feature/thusitha/frontend-foundation
+import { useLocation, useNavigate } from 'react-router-dom';
+
+export default function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [activeSidebarLink, setActiveSidebarLink] = useState('dashboard');
+
+  useEffect(() => {
+    const path = location.pathname.split('/')[1] || 'dashboard';
+    const validLinks = ['dashboard', 'ai-assistant', 'cash-flow', 'transactions', 'settings', 'plans', 'billing', 'profile'];
+    if (validLinks.includes(path)) {
+      if (path === 'billing') {
+        setActiveSidebarLink('settings');
+      } else {
+        setActiveSidebarLink(path);
+      }
+    }
+  }, [location]);
+
+  const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false);
+  const [isAddAutopilotOpen, setIsAddAutopilotOpen] = useState(false);
+=======
   return list
     .map((item) => {
       if (!item || typeof item !== "object") return null
@@ -317,6 +358,7 @@ export default function App() {
       void loadChatHistory()
     }
   }, [activeSidebarLink, loadChatHistory])
+>>>>>>> master
 
   useEffect(() => {
     const handleGlobalFocus = (e: FocusEvent) => {
@@ -338,9 +380,19 @@ export default function App() {
   }, [])
 
   const handleSidebarLinkClick = (linkId: string) => {
+<<<<<<< feature/thusitha/frontend-foundation
+    const allLinks = [...mockSidebarLinks.main, ...mockSidebarLinks.secondary, ...mockSidebarLinks.bottom];
+    const link = allLinks.find(l => l.id === linkId);
+    if (link) {
+      navigate(link.href);
+    }
+    setActiveSidebarLink(linkId);
+  };
+=======
     setActiveSidebarLink(linkId)
     console.log("Navigate to:", linkId)
   }
+>>>>>>> master
 
   const handleAddTransaction = () => {
     setIsAddTransactionOpen(true)
@@ -531,6 +583,60 @@ export default function App() {
   }
 
   return (
+<<<<<<< feature/thusitha/frontend-foundation
+    <>
+      <MainLayout
+        user={mockUser}
+        sidebarLinks={mockSidebarLinks}
+        chatLinks={mockChatLinks}
+        activeSidebarLink={activeSidebarLink}
+        onSidebarLinkClick={handleSidebarLinkClick}
+        onAddTransaction={handleAddTransaction}
+        onUserMenuClick={handleUserMenuClick}
+        onNewChat={handleNewChat}
+      >
+        {activeSidebarLink === 'ai-assistant' ? (
+          <AIAssistantPage />
+        ) : activeSidebarLink === 'dashboard' ? (
+          <Dashboard />
+        ) : activeSidebarLink === 'cash-flow' ? (
+          <CashflowPage />
+        ) : activeSidebarLink === 'settings' ? (
+          <AppSettings />
+        ) : activeSidebarLink === 'profile' ? (
+          <ProfileSettings />
+        ) : (
+          <TransactionsPage
+            transactionGroups={mockTransactionGroups}
+            autopilotFlowGroups={mockAutopilotFlowGroups}
+            autopilotTotalSavings={51500}
+            onTransactionMenuClick={handleTransactionMenuClick}
+            onNewAutopilotFlowClick={handleNewAutopilotFlowClick}
+            onAutopilotFlowToggle={handleAutopilotFlowToggle}
+            onAutopilotFlowClick={handleAutopilotFlowClick}
+            onFilterChange={handleFilterChange}
+          />
+        )}
+
+        {isAddTransactionOpen && (
+          <AddTransactionModal
+            onClose={() => setIsAddTransactionOpen(false)}
+            onSave={(data) => {
+              console.log('Saved transaction payload:', data);
+              toast.success(`${data.name || 'Transaction'} added successfully`);
+              setIsAddTransactionOpen(false);
+            }}
+          />
+        )}
+
+        {isAddAutopilotOpen && (
+          <AddNewAutopilotDrawer onClose={() => setIsAddAutopilotOpen(false)} />
+        )}
+      </MainLayout>
+    </>
+  );
+}
+=======
     <MainLayout
       user={DEFAULT_USER}
       sidebarLinks={mockSidebarLinks}
@@ -645,3 +751,4 @@ export default function App() {
     </MainLayout>
   )
 }
+>>>>>>> master
