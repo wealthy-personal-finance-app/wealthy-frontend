@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ChevronRight, Search, Plus, Calendar as CalendarIcon, ChevronDown, ChevronLeft, Check, X } from 'lucide-react';
 import { TransactionType } from './HistoryView';
 import { CategoryIcon } from './CategoryIcon';
+import { toast } from 'sonner';
 
 export interface CategoryData {
   id: string;
@@ -69,46 +70,67 @@ export function AddTransactionModal({ onClose, onSave }: AddTransactionModalProp
   // Master State
   const [transactionType, setTransactionType] = useState<AllowedTypes>('Expense');
   const [amount, setAmount] = useState('0');
+  const [transactionName, setTransactionName] = useState('');
   const [category, setCategory] = useState<string | null>(null);
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [note, setNote] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [showAllCategories, setShowAllCategories] = useState(false);
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [viewDate, setViewDate] = useState(new Date()); // For calendar navigation
 
-  // Progressive disclosure view state
-  const [viewState, setViewState] = useState<'main' | 'create-category'>('main');
-  const [newMasterCategoryRef, setNewMasterCategoryRef] = useState<string | null>(null);
+  // Category view inside dropdown
+  const [categoryViewState, setCategoryViewState] = useState<'list' | 'create'>('list');
+  const [newCategoryLabel, setNewCategoryLabel] = useState('');
+  const [selectedMasterCategory, setSelectedMasterCategory] = useState<string | null>(null);
 
   // Focus ref for amount input
   const amountInputRef = useRef<HTMLInputElement>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
+  const categoryRef = useRef<HTMLDivElement>(null);
+  const categorySearchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (viewState === 'main') {
+    if (amountInputRef.current) {
       setTimeout(() => {
         amountInputRef.current?.focus();
       }, 100);
     }
-  }, [viewState]);
+  }, []);
+
+  useEffect(() => {
+    if (isCategoryOpen) {
+      setTimeout(() => {
+        categoryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        categorySearchRef.current?.focus();
+      }, 300); // Slightly longer delay to allow modal layout to settle
+    }
+  }, [isCategoryOpen]);
+
+  useEffect(() => {
+    if (isCalendarOpen) {
+      setTimeout(() => {
+        calendarRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+    }
+  }, [isCalendarOpen]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (calendarRef.current && !calendarRef.current.contains(event.target as Node)) {
         setIsCalendarOpen(false);
       }
+      if (categoryRef.current && !categoryRef.current.contains(event.target as Node)) {
+        setIsCategoryOpen(false);
+      }
     };
-    if (isCalendarOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
+    document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isCalendarOpen]);
+  }, [isCalendarOpen, isCategoryOpen]);
 
   // Derived Categories based on type
-  // (In a real app, this would be global state or a hook)
   const [allExpenseCats, setAllExpenseCats] = useState(initialExpenseCategories);
   const [allIncomeCats, setAllIncomeCats] = useState(initialIncomeCategories);
   const [allAssetCats, setAllAssetCats] = useState(initialAssetCategories);
@@ -127,25 +149,15 @@ export function AddTransactionModal({ onClose, onSave }: AddTransactionModalProp
     c.label.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const visibleCategories = (searchQuery === '' && !showAllCategories)
-    ? filteredCategories.slice(0, 6)
-    : filteredCategories;
-
-  // Grouping for rendering
-  const groupedFiltered = visibleCategories.reduce((acc, cat) => {
-    if (!acc[cat.masterCategory]) acc[cat.masterCategory] = [];
-    acc[cat.masterCategory].push(cat);
-    return acc;
-  }, {} as Record<string, CategoryData[]>);
-
-  const handleCreateCategorySubmit = () => {
-    if (!newMasterCategoryRef || !searchQuery) return;
+  const handleCreateCategory = (masterCat: string) => {
+    const label = newCategoryLabel || searchQuery;
+    if (!label) return;
 
     const newCat: CategoryData = {
-      id: searchQuery.toLowerCase().replace(/\s+/g, '-'),
-      label: searchQuery,
-      icon: 'star', // fallback icon
-      masterCategory: newMasterCategoryRef
+      id: label.toLowerCase().replace(/\s+/g, '-'),
+      label: label,
+      icon: 'star',
+      masterCategory: masterCat
     };
 
     if (transactionType === 'Expense') setAllExpenseCats([...allExpenseCats, newCat]);
@@ -153,16 +165,19 @@ export function AddTransactionModal({ onClose, onSave }: AddTransactionModalProp
     else if (transactionType === 'Asset') setAllAssetCats([...allAssetCats, newCat]);
     else setAllLiabilityCats([...allLiabilityCats, newCat]);
 
-    setCategory(newCat.id);
-    setViewState('main');
+    setCategory(newCat.label);
+    setCategoryViewState('list');
+    setIsCategoryOpen(false);
     setSearchQuery('');
+    toast.success(`Category "${label}" created successfully`);
   };
 
   const handleFinalSave = () => {
     const payload = {
       type: transactionType,
       amount,
-      categoryId: category,
+      name: transactionName,
+      category: category,
       date,
       note
     };
@@ -206,337 +221,362 @@ export function AddTransactionModal({ onClose, onSave }: AddTransactionModalProp
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex justify-center items-center p-[24px] bg-black/50 backdrop-blur-sm"
       onClick={handleBackdropClick}
     >
-      <div className="bg-[#191b1f] border border-[#2e2f33] rounded-[16px] w-full max-w-[480px] p-[16px] flex flex-col gap-[16px] shadow-[0px_10px_100px_0px_rgba(10,10,57,0.15)] animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-[#191b1f] border border-[#2e2f33] rounded-[16px] w-full max-w-[540px] max-h-full p-[24px] flex flex-col gap-[20px] shadow-[0px_10px_100px_0px_rgba(10,10,57,0.15)] animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+        
+        <div className="flex items-center justify-between">
+          <h2 className="text-white text-[18px] font-semibold font-['Inter_Tight',sans-serif]">
+            Add Transaction
+          </h2>
+          <button onClick={onClose} className="p-[4px] hover:bg-[#2e2f33] rounded-full transition-colors">
+            <X size={20} className="text-[#717784]" />
+          </button>
+        </div>
 
-        {viewState === 'main' ? (
-          <>
-            <h2 className="text-white text-[14px] font-medium font-['Inter_Tight',sans-serif]">
-              Add Transaction
-            </h2>
+        {/* Top Toggle */}
+        <div className="bg-[#131417] border border-[#2e2f33] rounded-[12px] p-[4px] flex gap-[4px] shrink-0">
+          {(['Expense', 'Income', 'Asset', 'Liability'] as AllowedTypes[]).map((type) => (
+            <button
+              key={type}
+              onClick={() => {
+                setTransactionType(type);
+                setCategory(null);
+                setCategoryViewState('list');
+              }}
+              className={`flex-1 flex items-center justify-center py-[6px] px-[8px] rounded-[8px] transition-all duration-200 ${transactionType === type
+                ? 'bg-[rgba(65,63,63,0.5)] shadow-[0_1px_6px_0_rgba(14,18,27,0.08)]'
+                : 'hover:bg-[#2e2f33]/30'
+                }`}
+            >
+              <span className={`text-[14px] font-['Inter_Tight',sans-serif] ${transactionType === type ? 'text-white font-medium' : 'text-[#717784]'}`}>
+                {type}
+              </span>
+            </button>
+          ))}
+        </div>
 
-            {/* Top Toggle */}
-            <div className="bg-[#191b1f] border border-[#2e2f33] rounded-[12px] p-[4px] flex gap-[4px]">
-              {(['Expense', 'Income', 'Asset', 'Liability'] as AllowedTypes[]).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => {
-                    setTransactionType(type);
-                    setCategory(null); // reset category on type change
-                    setShowAllCategories(false); // reset expanded state
-                  }}
-                  className={`flex-1 flex items-center justify-center py-[4px] px-[8px] rounded-[8px] transition-all duration-200 ${transactionType === type
-                    ? 'bg-[rgba(65,63,63,0.5)] shadow-[0_1px_6px_0_rgba(14,18,27,0.08)]'
-                    : 'hover:bg-[#2e2f33]/30'
-                    }`}
-                >
-                  <span className={`text-[14px] font-['Inter_Tight',sans-serif] ${transactionType === type ? 'text-white font-medium' : 'text-[#717784]'}`}>
-                    {type}
+        <div className={`flex-1 min-h-0 flex flex-col gap-[16px] overflow-y-auto pr-[4px] scrollbar-hide transition-all duration-300 ${(isCategoryOpen || isCalendarOpen) ? 'pb-[240px]' : 'pb-[8px]'}`}>
+          {/* Transaction Amount */}
+          <div className="flex flex-col gap-[8px]">
+            <label className="text-[#717784] text-[14px] font-medium font-['Inter_Tight',sans-serif]">
+              Transaction Amount
+            </label>
+            <div className="bg-[#131417] border border-[#2e2f33] flex gap-[12px] items-center p-[20px] relative rounded-[12px] w-full focus-within:border-[#99a0ae] transition-colors shadow-inner">
+              <span className="text-white font-['Inter_Tight',sans-serif] text-[18px] font-semibold">
+                LKR
+              </span>
+              <input
+                ref={amountInputRef}
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="bg-transparent flex-1 font-['Inter_Tight',sans-serif] font-semibold text-[18px] text-white outline-none"
+                placeholder="0.00"
+                step="0.01"
+              />
+            </div>
+          </div>
+
+          {/* Transaction Name field */}
+          <div className="flex flex-col gap-[8px]">
+            <label className="text-[#717784] text-[14px] font-medium font-['Inter_Tight',sans-serif]">
+              Transaction Name
+            </label>
+            <div className="bg-[#131417] border border-[#2e2f33] py-[8px] px-[12px] rounded-[8px] focus-within:border-[#99a0ae] transition-colors">
+              <input 
+                type="text"
+                value={transactionName}
+                onChange={(e) => setTransactionName(e.target.value)}
+                placeholder="e.g. Lunch with friends"
+                className="bg-transparent w-full outline-none text-white font-['Inter_Tight',sans-serif] text-[16px]"
+              />
+            </div>
+          </div>
+
+          {/* Category selection */}
+          <div className="flex flex-col gap-[8px]">
+            <label className="text-[#717784] text-[14px] font-medium font-['Inter_Tight',sans-serif]">
+              Category
+            </label>
+            <div className="relative w-full" ref={categoryRef}>
+              <div 
+                onClick={() => setIsCategoryOpen(!isCategoryOpen)}
+                className={`bg-[#131417] border border-[#2e2f33] h-[40px] px-[12px] flex items-center justify-between relative ${isCategoryOpen ? 'rounded-t-[8px] rounded-b-none' : 'rounded-[8px]'} w-full focus-within:border-[#99a0ae] transition-colors cursor-pointer shadow-inner`}
+              >
+                <div className="flex items-center gap-[12px]">
+                  {category ? (
+                    <div className="w-[24px] h-[24px] flex items-center justify-center shrink-0">
+                      <CategoryIcon 
+                        icon={currentCategories.find(c => c.label === category)?.icon || 'star'} 
+                        size={18} 
+                        color="#99a0ae" 
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-[24px] h-[24px] rounded-full border border-dashed border-[#2e2f33] shrink-0" />
+                  )}
+                  <span className={`font-['Inter_Tight',sans-serif] font-medium text-[16px] ${category ? 'text-white' : 'text-[#717784]'}`}>
+                    {category || 'Select Category'}
                   </span>
-                </button>
-              ))}
-            </div>
-
-            {/* Transaction Amount */}
-            <div className="flex flex-col gap-[8px]">
-              <label className="text-[#717784] text-[14px] font-medium font-['Inter_Tight',sans-serif]">
-                Transaction Amount
-              </label>
-              <div className="bg-[#141414] border-[1px] border-[#2e2f33] border-solid flex gap-[12px] items-center p-[20px] relative rounded-[12px] w-full focus-within:border-[#99a0ae] transition-colors shadow-[0_1px_2px_0_rgba(10,13,20,0.03)]">
-                <span className="text-white font-['Inter_Tight',sans-serif] text-[18px] font-semibold">
-                  LKR
-                </span>
-                <input
-                  ref={amountInputRef}
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  className="bg-transparent flex-1 font-['Inter_Tight',sans-serif] font-semibold text-[18px] text-white outline-none"
-                  placeholder="0.00"
-                  step="0.01"
-                  onFocus={(e) => e.target.select()}
-                />
-              </div>
-            </div>
-
-            {/* Category Section Wrapper */}
-            <div className="bg-[#15171A] border border-[#2e2f33] rounded-[12px] p-[12px] flex flex-col gap-[8px]">
-              {/* Search Category */}
-              <div className="bg-[#141414] border-[1px] border-[#2e2f33] border-solid flex gap-[12px] items-center px-[12px] py-[8px] relative rounded-[8px] w-full focus-within:border-[#99a0ae] transition-colors">
-                <Search size={16} className="text-[#99a0ae]" />
-                <input
-                  type="text"
-                  placeholder="Search Category"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="bg-transparent flex-1 font-['Inter_Tight',sans-serif] font-normal text-[14px] text-[#717784] outline-none placeholder:text-[#717784]"
-                  onFocus={(e) => e.target.select()}
-                />
+                </div>
+                <ChevronDown color="#717784" size={20} className={`transition-transform duration-200 ${isCategoryOpen ? 'rotate-180' : ''}`} />
               </div>
 
-              {/* Categories Grid or Create Button */}
-              <div className="max-h-[300px] overflow-y-auto scrollbar-hide py-[4px] flex flex-col gap-[8px]">
-                {visibleCategories.length > 0 ? (
-                  showAllCategories || searchQuery !== '' ? (
-                    // Grouped view
-                    Object.entries(groupedFiltered).map(([masterCat, cats]) => (
-                      <div key={masterCat} className="flex flex-col gap-[8px] w-full">
-                        <span className="text-[#717784] text-[14px] font-medium font-['Inter_Tight',sans-serif]">
-                          {masterCat}
-                        </span>
-                        <div className="grid grid-cols-3 gap-[12px] pb-[8px]">
-                          {cats.map((c) => {
-                            const isSelected = category === c.id;
-                            return (
-                              <button
-                                key={c.id}
-                                onClick={() => setCategory(c.id)}
-                                className={`flex items-center p-[8px] rounded-[12px] border transition-all ${isSelected
-                                  ? 'bg-[rgba(64,196,170,0.1)] border-[#40c4aa]'
-                                  : 'bg-[#191b1f] border-[#2e2f33] hover:bg-[#2e2f33]/40'
-                                  }`}
-                              >
-                                <div className="flex items-center gap-[8px] min-w-0">
-                                  <div className={`w-[24px] h-[24px] rounded-[6px] shrink-0 flex items-center justify-center transition-colors ${isSelected ? 'bg-[#40c4aa]/20' : ''}`}>
-                                    <CategoryIcon
-                                      icon={c.icon}
-                                      size={18}
-                                      color={isSelected ? '#40c4aa' : '#99a0ae'}
-                                    />
-                                  </div>
-                                  <span className={`text-[14px] font-['Inter_Tight',sans-serif] font-medium truncate ${isSelected ? 'text-white' : 'text-[#99a0ae]'}`}>
-                                    {c.label}
+              {isCategoryOpen && (
+                <div className="absolute top-full left-0 right-0 z-[100] bg-[#15171a] border border-[#2e2f33] border-solid border-t-0 flex flex-col items-start overflow-clip pb-[24px] pt-[16px] px-[16px] rounded-b-[16px] rounded-t-none shadow-[0px_10px_100px_0px_rgba(10,10,57,0.15)] animate-in fade-in slide-in-from-top-1 duration-200">
+                  {categoryViewState === 'list' ? (
+                    <>
+                      <div className="bg-[#191b1f] border border-[#2e2f33] rounded-[8px] h-[40px] px-[8px] flex items-center gap-[4px] w-full mb-[8px] shadow-[0px_2px_8px_-4px_rgba(10,13,20,0.2)]">
+                        <Search size={16} className="text-[#99a0ae] shrink-0" />
+                        <input 
+                          ref={categorySearchRef}
+                          type="text" 
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          placeholder="Search Category" 
+                          className="bg-transparent flex-1 font-['Inter_Tight',sans-serif] font-medium text-[14px] leading-[18px] text-[#99a0ae] outline-none placeholder:text-[#99a0ae]"
+                        />
+                      </div>
+                      
+                      <div className="w-full flex-col flex max-h-[260px] overflow-y-auto scrollbar-hide">
+                        {filteredCategories.length > 0 ? (
+                          <>
+                            {Object.entries(
+                              filteredCategories.reduce((acc, cat) => {
+                                if (!acc[cat.masterCategory]) acc[cat.masterCategory] = [];
+                                acc[cat.masterCategory].push(cat);
+                                return acc;
+                              }, {} as Record<string, CategoryData[]>)
+                            ).map(([masterCat, cats]) => (
+                              <div key={masterCat} className="flex flex-col items-start w-full gap-[6px]">
+                                <div className="py-[6px] w-full border-b border-[#2e2f33] mb-[6px]">
+                                  <span className="text-[#717784] font-['Inter_Tight',sans-serif] font-medium text-[12px] leading-[18px] uppercase tracking-wider">
+                                    {masterCat}
                                   </span>
                                 </div>
+                                <div className="flex flex-col gap-[4px] items-start w-full">
+                                  {cats.map((c, index) => (
+                                    <React.Fragment key={c.id}>
+                                      {index !== 0 && <div className="h-px bg-[#2e2f33] w-full" />}
+                                      <div 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setCategory(c.label);
+                                          setIsCategoryOpen(false);
+                                          setSearchQuery('');
+                                        }}
+                                        className="flex items-center gap-[10px] px-[12px] py-[8px] rounded-[10px] cursor-pointer hover:bg-white/[0.04] transition-colors w-full"
+                                      >
+                                        <div className="w-[24px] h-[24px] flex items-center justify-center shrink-0">
+                                          <CategoryIcon icon={c.icon} size={18} color="#99a0ae" />
+                                        </div>
+                                        <span className="text-[14px] text-white font-['Inter_Tight',sans-serif] font-medium">
+                                          {c.label}
+                                        </span>
+                                      </div>
+                                    </React.Fragment>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+                            {searchQuery === '' && (
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setNewCategoryLabel('');
+                                  setCategoryViewState('create');
+                                }}
+                                className="flex items-center gap-[4px] mt-[12px] px-[8px] py-[4px] text-white hover:opacity-80 transition-opacity font-['Inter_Tight',sans-serif] font-medium text-[14px]"
+                              >
+                                <span>Create New Category</span>
+                                <ChevronRight size={16} />
                               </button>
-                            );
-                          })}
+                            )}
+                          </>
+                        ) : (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setNewCategoryLabel(searchQuery);
+                              setCategoryViewState('create');
+                            }}
+                            className="w-full flex items-center gap-[8px] p-[12px] bg-[#191b1f] border border-dashed border-[#40c4aa] rounded-[12px] hover:bg-[#40c4aa]/10 transition-colors mt-[8px] cursor-pointer"
+                          >
+                            <Plus size={16} className="text-[#40c4aa]" />
+                            <span className="text-[#40c4aa] text-[14px] font-medium font-['Inter_Tight',sans-serif]">
+                              Create "{searchQuery}"
+                            </span>
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="w-full flex flex-col gap-[16px]">
+                      {/* Name of Category */}
+                      <div className="flex flex-col gap-[8px]">
+                        <label className="text-[#717784] text-[10px] font-bold font-['Inter_Tight',sans-serif] uppercase tracking-wider">
+                          Name of Category
+                        </label>
+                        <div className="bg-[#191b1f] border border-[#2e2f33] rounded-[8px] h-[40px] px-[12px] flex items-center shadow-inner focus-within:border-[#99a0ae] transition-colors">
+                          <input 
+                            type="text" 
+                            value={newCategoryLabel} 
+                            onChange={(e) => setNewCategoryLabel(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder="Category Name"
+                            className="bg-transparent flex-1 text-white font-['Inter_Tight',sans-serif] text-[14px] outline-none placeholder:text-[#2e2f33]"
+                          />
                         </div>
                       </div>
-                    ))
-                  ) : (
-                    // Flat view for top 6 items
-                    <div className="grid grid-cols-3 gap-[12px]">
-                      {visibleCategories.map((c) => {
-                        const isSelected = category === c.id;
-                        return (
-                          <button
-                            key={c.id}
-                            onClick={() => setCategory(c.id)}
-                            className={`flex items-center p-[8px] rounded-[12px] border transition-all ${isSelected
-                              ? 'bg-[rgba(64,196,170,0.1)] border-[#40c4aa]'
-                              : 'bg-[#191b1f] border-[#2e2f33] hover:bg-[#2e2f33]/40'
+
+                      {/* Choose Main Category */}
+                      <div className="flex flex-col gap-[8px]">
+                        <label className="text-[#717784] text-[10px] font-bold font-['Inter_Tight',sans-serif] uppercase tracking-wider">
+                          Choose Main Category
+                        </label>
+                        <div className="flex flex-col gap-[2px] max-h-[160px] overflow-y-auto scrollbar-hide border border-[#2e2f33] rounded-[8px] bg-[#131417] p-[4px] shadow-inner">
+                          {masterCategoryOptions.map((masterOpt) => (
+                            <button
+                              key={masterOpt}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedMasterCategory(masterOpt);
+                              }}
+                              className={`flex items-center justify-between px-[12px] py-[8px] rounded-[6px] transition-all font-['Inter_Tight',sans-serif] text-[13px] text-left cursor-pointer ${
+                                selectedMasterCategory === masterOpt 
+                                  ? 'bg-[#2e2f33] text-white font-medium shadow-sm' 
+                                  : 'text-[#99a0ae] hover:bg-white/[0.04]'
                               }`}
-                          >
-                            <div className="flex items-center gap-[8px] min-w-0">
-                              <div className={`w-[24px] h-[24px] rounded-[6px] shrink-0 flex items-center justify-center transition-colors ${isSelected ? 'bg-[#40c4aa]/20' : ''}`}>
-                                <CategoryIcon
-                                  icon={c.icon}
-                                  size={18}
-                                  color={isSelected ? '#40c4aa' : '#99a0ae'}
-                                />
-                              </div>
-                              <span className={`text-[14px] font-['Inter_Tight',sans-serif] font-medium truncate ${isSelected ? 'text-white' : 'text-[#99a0ae]'}`}>
-                                {c.label}
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })}
+                            >
+                              <span>{masterOpt}</span>
+                              {selectedMasterCategory === masterOpt && (
+                                <Check size={14} className="text-[#40c4aa] shrink-0" />
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Footer Actions */}
+                      <div className="flex gap-[8px] pt-[8px]">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCategoryViewState('list');
+                            setSelectedMasterCategory(null);
+                          }}
+                          className="flex-1 py-[8px] rounded-[8px] border border-[#2e2f33] text-[#717784] text-[13px] font-medium font-['Inter_Tight',sans-serif] hover:bg-[#2e2f33]/40 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button 
+                          disabled={!newCategoryLabel.trim() || !selectedMasterCategory}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (selectedMasterCategory) handleCreateCategory(selectedMasterCategory);
+                          }}
+                          className="flex-1 py-[8px] rounded-[8px] bg-[#065f46] text-white text-[13px] font-semibold font-['Inter_Tight',sans-serif] hover:bg-[#087f5b] transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
+                        >
+                          Create Category
+                        </button>
+                      </div>
                     </div>
-                  )
-                ) : (
-                  <button
-                    onClick={() => setViewState('create-category')}
-                    className="w-full flex items-center gap-[8px] p-[12px] bg-[#191b1f] border border-dashed border-[#40c4aa] rounded-[12px] hover:bg-[#40c4aa]/10 transition-colors"
-                  >
-                    <Plus size={16} className="text-[#40c4aa]" />
-                    <span className="text-[#40c4aa] text-[14px] font-medium font-['Inter_Tight',sans-serif]">
-                      Create "{searchQuery}"
-                    </span>
-                  </button>
-                )}
-              </div>
-
-              {searchQuery === '' && !showAllCategories && filteredCategories.length > 6 && (
-                <button
-                  onClick={() => setShowAllCategories(true)}
-                  className="flex items-center justify-start gap-[4px] mt-[4px] text-[#717784] hover:text-white transition-colors"
-                >
-                  <span className="text-[14px] font-medium font-['Inter_Tight',sans-serif]">See All Categories</span>
-                  <ChevronRight size={16} />
-                </button>
-              )}
-
-              {searchQuery === '' && showAllCategories && (
-                <button
-                  onClick={() => setViewState('create-category')}
-                  className="flex items-center justify-start gap-[4px] mt-[4px] text-white hover:text-white/80 transition-colors"
-                >
-                  <span className="text-[16px] font-medium font-['Inter_Tight',sans-serif]">Create New Category</span>
-                  <ChevronRight size={20} />
-                </button>
-              )}
-            </div>
-
-            {/* Date & Note Row */}
-            <div className="flex flex-col gap-[8px]">
-              <div className="flex items-center gap-[2px]">
-                <label className="text-[#717784] text-[14px] font-medium font-['Inter_Tight',sans-serif]">
-                  Date
-                </label>
-                <span className="text-[#df1c41]">*</span>
-              </div>
-
-              <div className="relative" ref={calendarRef}>
-                <div
-                  className={`bg-[#141414] border-[1px] border-[#2e2f33] border-solid flex gap-[12px] items-center justify-between px-[12px] py-[8px] relative ${isCalendarOpen ? 'rounded-t-[8px]' : 'rounded-[8px]'} w-full focus-within:border-[#99a0ae] transition-all cursor-pointer`}
-                  onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-                >
-                  <span className="font-['Inter_Tight',sans-serif] font-normal text-[14px] text-[#717784]">
-                    {formatDateDisplay(date)}
-                  </span>
-                  <CalendarIcon size={16} className="text-[#99a0ae]" />
+                  )}
                 </div>
-
-                {isCalendarOpen && (
-                  <div className="absolute top-[100%] left-0 right-0 z-[60] bg-[#15161a] border border-[#2e2f33] border-t-0 rounded-b-[16px] p-[16px] shadow-[0px_10px_100px_0px_rgba(10,10,57,0.15)] animate-in fade-in slide-in-from-top-2 duration-200">
-                    <div className="flex items-center justify-between mb-[12px]">
-                      <button onClick={() => changeMonth(-1)} className="p-[4px] hover:bg-[#2e2f33]/40 rounded-full transition-colors text-[#99a0ae]">
-                        <ChevronLeft size={16} />
-                      </button>
-                      <span className="text-white text-[14px] font-medium font-['Inter_Tight',sans-serif]">
-                        {monthName} {year}
-                      </span>
-                      <button onClick={() => changeMonth(1)} className="p-[4px] hover:bg-[#2e2f33]/40 rounded-full transition-colors text-[#99a0ae]">
-                        <ChevronRight size={16} />
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-7 gap-[4px] mb-[4px]">
-                      {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
-                        <div key={d} className="text-[#717784] text-[10px] text-center font-medium uppercase">{d}</div>
-                      ))}
-                    </div>
-
-                    <div className="grid grid-cols-7 gap-[4px]">
-                      {Array.from({ length: firstDay }).map((_, i) => (
-                        <div key={`empty-${i}`} />
-                      ))}
-                      {days.map(d => {
-                        const isToday = new Date().toISOString().split('T')[0] === new Date(year, viewDate.getMonth(), d).toISOString().split('T')[0];
-                        const isSelected = date === new Date(year, viewDate.getMonth(), d).toISOString().split('T')[0];
-
-                        return (
-                          <button
-                            key={d}
-                            onClick={() => handleDateSelect(d)}
-                            className={`h-[28px] text-[12px] flex items-center justify-center rounded-[6px] transition-all ${isSelected
-                              ? 'bg-[#065f46] text-white'
-                              : isToday
-                                ? 'text-[#40c4aa] border border-[#40c4aa]/30'
-                                : 'text-[#99a0ae] hover:bg-[#2e2f33]/60'
-                              }`}
-                          >
-                            {d}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
+          </div>
 
-            <div className="flex flex-col gap-[8px]">
-              <div className="flex items-center gap-[2px]">
-                <label className="text-[#717784] text-[14px] font-medium font-['Inter_Tight',sans-serif]">
-                  Add note
-                </label>
-                <span className="text-[#717784] text-[12px]">(Optional)</span>
-              </div>
-              <div className="bg-[#141414] border-[1px] border-[#2e2f33] border-solid flex gap-[12px] items-center px-[12px] py-[8px] relative rounded-[8px] w-full focus-within:border-[#99a0ae] transition-colors">
-                <input
-                  type="text"
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder="Add a note"
-                  className="bg-transparent flex-1 font-['Inter_Tight',sans-serif] font-normal text-[14px] text-[#717784] outline-none placeholder:text-[#717784]"
-                  onFocus={(e) => e.target.select()}
-                />
-              </div>
-            </div>
-
-            {/* Footer Buttons */}
-            <div className="flex items-center justify-end gap-[16px] mt-[8px]">
-              <button
-                onClick={onClose}
-                className="px-[12px] py-[8px] border border-[#2e2f33] rounded-[8px] text-white text-[16px] font-medium font-['Inter_Tight',sans-serif] hover:bg-[#2e2f33]/40 transition-colors"
+          {/* Date Picker */}
+          <div className="flex flex-col gap-[8px]">
+            <label className="text-[#717784] text-[14px] font-medium font-['Inter_Tight',sans-serif]">
+              Date
+            </label>
+            <div className="relative" ref={calendarRef}>
+              <div
+                className={`bg-[#131417] border border-[#2e2f33] flex items-center justify-between px-[12px] h-[40px] relative ${isCalendarOpen ? 'rounded-t-[8px]' : 'rounded-[8px]'} w-full focus-within:border-[#99a0ae] transition-all cursor-pointer shadow-inner`}
+                onClick={() => setIsCalendarOpen(!isCalendarOpen)}
               >
-                Cancel
-              </button>
-              <button
-                onClick={handleFinalSave}
-                disabled={!category || amount === '0' || amount === ''}
-                className="px-[16px] py-[10px] bg-[#065f46] border border-[rgba(255,255,255,0.12)] rounded-[8px] shadow-[0px_1px_2px_0px_rgba(0,91,85,0.48),0px_0px_0px_1px_#005b55] text-white text-[14px] font-semibold font-['Public_Sans',sans-serif] hover:bg-[#065f46]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Add {transactionType}
-              </button>
-            </div>
+                <span className="font-['Inter_Tight',sans-serif] text-[15px] text-white">
+                  {formatDateDisplay(date)}
+                </span>
+                <CalendarIcon size={18} className="text-[#99a0ae]" />
+              </div>
 
-          </>
-        ) : (
-          /* Create Category View */
-          <>
-            <div className="flex items-center justify-between">
-              <h2 className="text-white text-[18px] font-medium font-['Inter_Tight',sans-serif]">
-                Where does "{searchQuery}" belong?
-              </h2>
-            </div>
-
-            <div className="flex flex-col gap-[12px] mt-[16px] overflow-y-auto max-h-[400px] scrollbar-hide py-[4px]">
-              {masterCategoryOptions.map((masterOpt) => {
-                const isSelected = newMasterCategoryRef === masterOpt;
-                return (
-                  <button
-                    key={masterOpt}
-                    onClick={() => setNewMasterCategoryRef(masterOpt)}
-                    className={`flex items-center justify-between p-[16px] rounded-[12px] border transition-all ${isSelected
-                      ? 'bg-[rgba(64,196,170,0.1)] border-[#40c4aa]'
-                      : 'bg-[#191b1f] border-[#2e2f33] hover:bg-[#2e2f33]/40'
-                      }`}
-                  >
-                    <span className={`text-[16px] font-['Inter_Tight',sans-serif] font-medium ${isSelected ? 'text-[#40c4aa]' : 'text-[#99a0ae]'}`}>
-                      {masterOpt}
+              {isCalendarOpen && (
+                <div className="absolute top-[100%] left-0 right-0 z-[60] bg-[#15161a] border border-[#2e2f33] border-t-0 rounded-b-[16px] p-[16px] shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="flex items-center justify-between mb-[12px]">
+                    <button onClick={(e) => { e.stopPropagation(); changeMonth(-1); }} className="p-[4px] hover:bg-[#2e2f33] rounded-full text-[#99a0ae]">
+                      <ChevronLeft size={16} />
+                    </button>
+                    <span className="text-white text-[14px] font-medium">
+                      {monthName} {year}
                     </span>
-                    {isSelected && <div className="w-[8px] h-[8px] rounded-full bg-[#40c4aa]"></div>}
-                  </button>
-                )
-              })}
+                    <button onClick={(e) => { e.stopPropagation(); changeMonth(1); }} className="p-[4px] hover:bg-[#2e2f33] rounded-full text-[#99a0ae]">
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-7 gap-[2px] mb-[4px]">
+                    {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
+                      <div key={d} className="text-[#717784] text-[10px] text-center font-medium">{d}</div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-7 gap-[2px]">
+                    {Array.from({ length: firstDay }).map((_, i) => <div key={i} />)}
+                    {days.map(d => {
+                      const isSelected = date === new Date(year, viewDate.getMonth(), d).toISOString().split('T')[0];
+                      return (
+                        <button
+                          key={d}
+                          onClick={(e) => { e.stopPropagation(); handleDateSelect(d); }}
+                          className={`h-[28px] text-[12px] flex items-center justify-center rounded-[6px] transition-all ${isSelected ? 'bg-[#40c4aa] text-black font-semibold' : 'text-[#99a0ae] hover:bg-[#2e2f33]'}`}
+                        >
+                          {d}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
+          </div>
 
-            <div className="flex items-center justify-end gap-[16px] mt-[16px]">
-              <button
-                onClick={() => {
-                  setViewState('main');
-                  setNewMasterCategoryRef(null);
-                }}
-                className="px-[12px] py-[8px] border border-[#2e2f33] rounded-[8px] text-white text-[14px] font-medium font-['Inter_Tight',sans-serif] hover:bg-[#2e2f33]/30 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateCategorySubmit}
-                disabled={!newMasterCategoryRef}
-                className="px-[16px] py-[10px] bg-[#065f46] border border-white/10 rounded-[8px] text-white text-[14px] font-semibold font-['Inter_Tight',sans-serif] hover:bg-[#065f46]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Create
-              </button>
+          {/* Note */}
+          <div className="flex flex-col gap-[8px]">
+            <label className="text-[#717784] text-[14px] font-medium font-['Inter_Tight',sans-serif]">
+              Note (Optional)
+            </label>
+            <div className="bg-[#131417] border border-[#2e2f33] h-[40px] px-[12px] rounded-[8px] flex items-center focus-within:border-[#99a0ae] transition-colors shadow-inner">
+              <input
+                type="text"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Memo"
+                className="bg-transparent w-full outline-none text-white font-['Inter_Tight',sans-serif] text-[15px]"
+              />
             </div>
-          </>
-        )}
+          </div>
+        </div>
+
+        {/* Footer Buttons */}
+        <div className="flex items-center gap-[12px] pt-[8px]">
+          <button
+            onClick={onClose}
+            className="flex-1 py-[12px] border border-[#2e2f33] rounded-[12px] text-white text-[16px] font-medium font-['Inter_Tight',sans-serif] hover:bg-[#2e2f33]/40 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleFinalSave}
+            disabled={!category || !amount || amount === '0' || !transactionName}
+            className="flex-1 py-[12px] bg-[#065f46] border border-white/10 rounded-[12px] shadow-lg text-white text-[16px] font-semibold font-['Inter_Tight',sans-serif] hover:bg-[#087f5b] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Add {transactionType}
+          </button>
+        </div>
 
       </div>
     </div>

@@ -13,6 +13,7 @@ import {
   AreaChart, Area
 } from 'recharts';
 import { CategoryIcon } from '../transactions/CategoryIcon';
+import { toast } from 'sonner';
 
 // --- MOCK DATA FOR BACKEND INTEGRATION ---
 const mockDashboardData = {
@@ -233,8 +234,16 @@ function ExpenseAllocationWidget({ data }: { data: typeof mockDashboardData.allo
 }
 
 function AutopilotTasksWidget({ pendingTasks }: { pendingTasks: typeof mockDashboardData.pendingAutopilotTasks }) {
-  const handleSkip = (id: string) => console.log('Skip skipped:', id);
-  const handleLog = (id: string) => console.log('Log task:', id);
+  const handleSkip = (id: string) => {
+    console.log('Skip skipped:', id);
+    const task = pendingTasks.find(t => t.id === id);
+    toast.info(`Skipped "${task?.title}"`);
+  };
+  const handleLog = (id: string) => {
+    console.log('Log task:', id);
+    const task = pendingTasks.find(t => t.id === id);
+    toast.success(`Logged "${task?.title}" successfully`);
+  };
 
   return (
     <div className="bg-[#191b1f] border border-[#2e2f33] rounded-[16px] flex-1 flex flex-col overflow-hidden">
@@ -281,10 +290,16 @@ function AutopilotTasksWidget({ pendingTasks }: { pendingTasks: typeof mockDashb
       </div>
 
       <div className="p-[16px] pt-0 flex gap-[12px]">
-         <button className="flex-1 py-[10px] text-center rounded-[8px] border border-[#2e2f33] text-[#717784] hover:text-white font-medium text-[14px] transition-colors cursor-pointer" onClick={() => console.log('Skip all')}>
+         <button className="flex-1 py-[10px] text-center rounded-[8px] border border-[#2e2f33] text-[#717784] hover:text-white font-medium text-[14px] transition-colors cursor-pointer" onClick={() => {
+           console.log('Skip all');
+           toast.info('Skipped all pending tasks today');
+         }}>
            Skip All Today
          </button>
-         <button className="flex-1 py-[10px] text-center rounded-[8px] bg-[#065f46] border border-white/10 hover:bg-[#065f46]/90 text-white font-semibold font-['Inter_Tight',sans-serif] text-[14px] transition-colors cursor-pointer" onClick={() => console.log('Log all')}>
+         <button className="flex-1 py-[10px] text-center rounded-[8px] bg-[#065f46] border border-white/10 hover:bg-[#065f46]/90 text-white font-semibold font-['Inter_Tight',sans-serif] text-[14px] transition-colors cursor-pointer" onClick={() => {
+           console.log('Log all');
+           toast.success('Logged all pending tasks successfully');
+         }}>
            Log All Tasks
          </button>
       </div>

@@ -8,6 +8,9 @@ import { FilterState } from './components/transactions/FilterMenu';
 import { AddTransactionModal } from './components/transactions/AddTransactionModal';
 import { AddNewAutopilotDrawer } from './components/transactions/AddNewAutopilotDrawer';
 import { Dashboard } from './components/dashboard/Dashboard';
+import { CashflowPage } from './components/cashflow/CashflowPage';
+import { Toaster } from './components/ui/sonner';
+import { toast } from 'sonner';
 
 // Mock data - replace with API calls
 const mockTransactionGroups: TransactionGroup[] = [
@@ -81,7 +84,7 @@ const mockAutopilotFlowGroups: AutopilotFlowGroup[] = [
         schedule: '1st of every month',
         amount: 50000,
         type: 'expense',
-        icon: 'home',
+        icon: 'house',
         enabled: true,
       },
       {
@@ -90,7 +93,7 @@ const mockAutopilotFlowGroups: AutopilotFlowGroup[] = [
         schedule: '15th of every month',
         amount: 4000,
         type: 'expense',
-        icon: 'receipt',
+        icon: 'zap',
         enabled: false,
       },
       {
@@ -223,6 +226,7 @@ export default function App() {
 
   const handleTransactionMenuClick = (transactionId: string) => {
     console.log('Transaction menu clicked:', transactionId);
+    toast.info('Opening transaction options');
   };
 
   const handleNewAutopilotFlowClick = () => {
@@ -231,6 +235,12 @@ export default function App() {
 
   const handleAutopilotFlowToggle = (flowId: string, enabled: boolean) => {
     console.log('Autopilot flow toggled:', flowId, enabled);
+    const flow = mockAutopilotFlowGroups.flatMap(g => g.flows).find(f => f.id === flowId);
+    if (enabled) {
+      toast.success(`${flow?.title || 'Flow'} enabled`);
+    } else {
+      toast.info(`${flow?.title || 'Flow'} disabled`);
+    }
   };
 
   const handleAutopilotFlowClick = (flowId: string) => {
@@ -244,49 +254,56 @@ export default function App() {
 
   const handleNewChat = () => {
     console.log('New chat clicked');
+    toast.success('Starting new AI conversation');
   };
 
   return (
-    <MainLayout
-      user={mockUser}
-      sidebarLinks={mockSidebarLinks}
-      chatLinks={mockChatLinks}
-      activeSidebarLink={activeSidebarLink}
-      onSidebarLinkClick={handleSidebarLinkClick}
-      onAddTransaction={handleAddTransaction}
-      onUserMenuClick={handleUserMenuClick}
-      onNewChat={handleNewChat}
-    >
-      {activeSidebarLink === 'ai-assistant' ? (
-        <AIAssistantPage />
-      ) : activeSidebarLink === 'dashboard' ? (
-        <Dashboard />
-      ) : (
-        <TransactionsPage
-          transactionGroups={mockTransactionGroups}
-          autopilotFlowGroups={mockAutopilotFlowGroups}
-          autopilotTotalSavings={51500}
-          onTransactionMenuClick={handleTransactionMenuClick}
-          onNewAutopilotFlowClick={handleNewAutopilotFlowClick}
-          onAutopilotFlowToggle={handleAutopilotFlowToggle}
-          onAutopilotFlowClick={handleAutopilotFlowClick}
-          onFilterChange={handleFilterChange}
-        />
-      )}
+    <>
+      <MainLayout
+        user={mockUser}
+        sidebarLinks={mockSidebarLinks}
+        chatLinks={mockChatLinks}
+        activeSidebarLink={activeSidebarLink}
+        onSidebarLinkClick={handleSidebarLinkClick}
+        onAddTransaction={handleAddTransaction}
+        onUserMenuClick={handleUserMenuClick}
+        onNewChat={handleNewChat}
+      >
+        {activeSidebarLink === 'ai-assistant' ? (
+          <AIAssistantPage />
+        ) : activeSidebarLink === 'dashboard' ? (
+          <Dashboard />
+        ) : activeSidebarLink === 'cash-flow' ? (
+          <CashflowPage />
+        ) : (
+          <TransactionsPage
+            transactionGroups={mockTransactionGroups}
+            autopilotFlowGroups={mockAutopilotFlowGroups}
+            autopilotTotalSavings={51500}
+            onTransactionMenuClick={handleTransactionMenuClick}
+            onNewAutopilotFlowClick={handleNewAutopilotFlowClick}
+            onAutopilotFlowToggle={handleAutopilotFlowToggle}
+            onAutopilotFlowClick={handleAutopilotFlowClick}
+            onFilterChange={handleFilterChange}
+          />
+        )}
 
-      {isAddTransactionOpen && (
-        <AddTransactionModal 
-          onClose={() => setIsAddTransactionOpen(false)}
-          onSave={(data) => {
-            console.log('Saved transaction payload:', data);
-            setIsAddTransactionOpen(false);
-          }}
-        />
-      )}
+        {isAddTransactionOpen && (
+          <AddTransactionModal 
+            onClose={() => setIsAddTransactionOpen(false)}
+            onSave={(data) => {
+              console.log('Saved transaction payload:', data);
+              toast.success(`${data.name || 'Transaction'} added successfully`);
+              setIsAddTransactionOpen(false);
+            }}
+          />
+        )}
 
-      {isAddAutopilotOpen && (
-        <AddNewAutopilotDrawer onClose={() => setIsAddAutopilotOpen(false)} />
-      )}
-    </MainLayout>
+        {isAddAutopilotOpen && (
+          <AddNewAutopilotDrawer onClose={() => setIsAddAutopilotOpen(false)} />
+        )}
+      </MainLayout>
+      <Toaster position="bottom-center" expand={false} richColors />
+    </>
   );
 }

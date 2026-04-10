@@ -1,5 +1,8 @@
+import React, { useState } from 'react';
 import { CategoryIcon } from './CategoryIcon';
-import { MoreVertical } from 'lucide-react';
+import { MoreVertical, Trash2, Edit2 } from 'lucide-react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { EditTransactionForm } from './EditTransactionForm';
 
 export interface Transaction {
   id: string;
@@ -14,6 +17,8 @@ export interface Transaction {
 interface TransactionRowProps {
   transaction: Transaction;
   onMenuClick?: (transactionId: string) => void;
+  onDelete?: (transactionId: string) => void;
+  onUpdate?: (transactionId: string, data: any) => void;
 }
 
 function TransactionIcon({ icon }: { icon: string }) {
@@ -26,16 +31,35 @@ function TransactionIcon({ icon }: { icon: string }) {
   );
 }
 
-export function TransactionRow({ transaction, onMenuClick }: TransactionRowProps) {
+export function TransactionRow({ transaction, onMenuClick, onDelete, onUpdate }: TransactionRowProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [isHidden, setIsHidden] = useState(false);
+
+  if (isHidden) return null;
+
+  if (isEditing) {
+    return (
+      <EditTransactionForm 
+        transaction={transaction}
+        onClose={() => setIsEditing(false)}
+        onSave={(data) => {
+          onUpdate?.(transaction.id, data);
+          setIsEditing(false);
+        }}
+        onDelete={() => {
+          setIsHidden(true);
+          onDelete?.(transaction.id);
+        }}
+      />
+    );
+  }
+
   const isIncome = transaction.type === 'income';
   const formattedAmount = `${isIncome ? '+' : '-'}LKR ${transaction.amount.toLocaleString()}`;
-  // Expense uses design-system destructive, income uses chart-1 green
   const amountColor = isIncome ? '#40c4aa' : 'var(--destructive)';
 
   return (
-    /* Card row — bg + border overlay + rounded-[10px] Wealthy design system */
-    <div className="bg-[#191b1f] relative rounded-[10px] shrink-0 w-full">
-      {/* Absolute border overlay so it sits on top */}
+    <div className="bg-[#191b1f] relative rounded-[10px] shrink-0 w-full group">
       <div
         aria-hidden="true"
         className="absolute border border-[#2e2f33] border-solid inset-0 pointer-events-none rounded-[10px]"
@@ -92,20 +116,53 @@ export function TransactionRow({ transaction, onMenuClick }: TransactionRowProps
             {formattedAmount}
           </p>
 
-          {/* 3-dot menu button — 30×30 container with icon at left-6 top-6 */}
-          <button
-            onClick={() => onMenuClick?.(transaction.id)}
-            className="relative rounded-[8px] shrink-0 size-[30px] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
-          >
-            <MoreVertical
-              size={18}
-              strokeWidth={1.5}
-              color="#717784"
-              style={{ position: 'absolute', left: '6px', top: '6px' }}
-            />
-          </button>
+          {/* Context Menu */}
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <button
+                className="relative rounded-[8px] shrink-0 size-[30px] hover:bg-[rgba(255,255,255,0.06)] transition-colors flex items-center justify-center outline-none"
+              >
+                <MoreVertical
+                  size={18}
+                  strokeWidth={1.5}
+                  color="#717784"
+                />
+              </button>
+            </DropdownMenu.Trigger>
+
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content 
+                side="bottom" 
+                align="end" 
+                sideOffset={4}
+                className="z-50 w-[140px] bg-[#15161a] border border-[#2e2f33] rounded-[12px] p-[6px] shadow-[0px_10px_100px_0px_rgba(10,10,57,0.15)] animate-in fade-in zoom-in-95 duration-200 outline-none"
+              >
+                <DropdownMenu.Item 
+                  onSelect={() => setIsEditing(true)}
+                  className="flex items-center gap-[10px] py-[8px] px-[12px] rounded-[8px] cursor-pointer hover:bg-white/[0.04] transition-colors outline-none group"
+                >
+                  <Edit2 size={14} className="text-[#99a0ae] group-hover:text-white" />
+                  <span className="text-[13px] text-[#99a0ae] group-hover:text-white font-medium font-['Inter_Tight',sans-serif]">Edit</span>
+                </DropdownMenu.Item>
+                
+                <div className="h-px bg-[#2e2f33] mx-[4px] my-[4px]" />
+                
+                <DropdownMenu.Item 
+                  onSelect={() => {
+                    setIsHidden(true);
+                    onDelete?.(transaction.id);
+                  }}
+                  className="flex items-center gap-[10px] py-[8px] px-[12px] rounded-[8px] cursor-pointer hover:bg-[#df1c41]/10 transition-colors outline-none group"
+                >
+                  <Trash2 size={14} className="text-[#df1c41]" />
+                  <span className="text-[13px] text-[#df1c41] font-medium font-['Inter_Tight',sans-serif]">Delete</span>
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
         </div>
       </div>
     </div>
   );
 }
+
