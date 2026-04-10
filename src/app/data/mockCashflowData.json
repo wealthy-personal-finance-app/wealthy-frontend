@@ -20,6 +20,122 @@
     { "source": "Total Cash Flow", "target": "Growth & Giving", "value": 23000 },
     { "source": "Total Cash Flow", "target": "Unplanned", "value": 10000 }
   ],
+  "drilldown": {
+    "Active Income": {
+      "nodes": [
+        { "id": "Active Income", "color": "#10B981" },
+        { "id": "Salary", "color": "#10B981" },
+        { "id": "Freelance Projects", "color": "#10B981" },
+        { "id": "Overtime Pay", "color": "#10B981" },
+        { "id": "Consulting Fees", "color": "#10B981" }
+      ],
+      "links": [
+        { "source": "Active Income", "target": "Salary", "value": 85000 },
+        { "source": "Active Income", "target": "Freelance Projects", "value": 20000 },
+        { "source": "Active Income", "target": "Overtime Pay", "value": 8000 },
+        { "source": "Active Income", "target": "Consulting Fees", "value": 7000 }
+      ]
+    },
+    "Asset Income": {
+      "nodes": [
+        { "id": "Asset Income", "color": "#10B981" },
+        { "id": "Rental Income", "color": "#10B981" },
+        { "id": "Dividends", "color": "#10B981" },
+        { "id": "Interest Earnings", "color": "#10B981" }
+      ],
+      "links": [
+        { "source": "Asset Income", "target": "Rental Income", "value": 18000 },
+        { "source": "Asset Income", "target": "Dividends", "value": 12000 },
+        { "source": "Asset Income", "target": "Interest Earnings", "value": 5000 }
+      ]
+    },
+    "Other Income": {
+      "nodes": [
+        { "id": "Other Income", "color": "#10B981" },
+        { "id": "Tax Refund", "color": "#10B981" },
+        { "id": "Cashback Rewards", "color": "#10B981" },
+        { "id": "Gift Money", "color": "#10B981" }
+      ],
+      "links": [
+        { "source": "Other Income", "target": "Tax Refund", "value": 6000 },
+        { "source": "Other Income", "target": "Cashback Rewards", "value": 3500 },
+        { "source": "Other Income", "target": "Gift Money", "value": 3500 }
+      ]
+    },
+    "Essential Living": {
+      "nodes": [
+        { "id": "Essential Living", "color": "#EF4444" },
+        { "id": "Rent / Mortgage", "color": "#EF4444" },
+        { "id": "Groceries", "color": "#EF4444" },
+        { "id": "Electricity Bill", "color": "#EF4444" },
+        { "id": "Water & Gas", "color": "#EF4444" },
+        { "id": "Internet & Phone", "color": "#EF4444" }
+      ],
+      "links": [
+        { "source": "Essential Living", "target": "Rent / Mortgage", "value": 28000 },
+        { "source": "Essential Living", "target": "Groceries", "value": 15000 },
+        { "source": "Essential Living", "target": "Electricity Bill", "value": 8500 },
+        { "source": "Essential Living", "target": "Water & Gas", "value": 6500 },
+        { "source": "Essential Living", "target": "Internet & Phone", "value": 7000 }
+      ]
+    },
+    "Obligations & Liabilities": {
+      "nodes": [
+        { "id": "Obligations & Liabilities", "color": "#EF4444" },
+        { "id": "Car Loan EMI", "color": "#EF4444" },
+        { "id": "Credit Card Payment", "color": "#EF4444" },
+        { "id": "Insurance Premium", "color": "#EF4444" },
+        { "id": "Student Loan", "color": "#EF4444" }
+      ],
+      "links": [
+        { "source": "Obligations & Liabilities", "target": "Car Loan EMI", "value": 15000 },
+        { "source": "Obligations & Liabilities", "target": "Credit Card Payment", "value": 12000 },
+        { "source": "Obligations & Liabilities", "target": "Insurance Premium", "value": 8000 },
+        { "source": "Obligations & Liabilities", "target": "Student Loan", "value": 7000 }
+      ]
+    },
+    "Discretionary & Lifestyle": {
+      "nodes": [
+        { "id": "Discretionary & Lifestyle", "color": "#EF4444" },
+        { "id": "Dining Out", "color": "#EF4444" },
+        { "id": "Subscriptions", "color": "#EF4444" },
+        { "id": "Shopping", "color": "#EF4444" },
+        { "id": "Entertainment", "color": "#EF4444" }
+      ],
+      "links": [
+        { "source": "Discretionary & Lifestyle", "target": "Dining Out", "value": 8000 },
+        { "source": "Discretionary & Lifestyle", "target": "Subscriptions", "value": 5500 },
+        { "source": "Discretionary & Lifestyle", "target": "Shopping", "value": 9000 },
+        { "source": "Discretionary & Lifestyle", "target": "Entertainment", "value": 5500 }
+      ]
+    },
+    "Growth & Giving": {
+      "nodes": [
+        { "id": "Growth & Giving", "color": "#10B981" },
+        { "id": "Mutual Fund SIP", "color": "#10B981" },
+        { "id": "Savings Deposit", "color": "#10B981" },
+        { "id": "Charity Donation", "color": "#10B981" }
+      ],
+      "links": [
+        { "source": "Growth & Giving", "target": "Mutual Fund SIP", "value": 10000 },
+        { "source": "Growth & Giving", "target": "Savings Deposit", "value": 8000 },
+        { "source": "Growth & Giving", "target": "Charity Donation", "value": 5000 }
+      ]
+    },
+    "Unplanned": {
+      "nodes": [
+        { "id": "Unplanned", "color": "#EF4444" },
+        { "id": "Medical Emergency", "color": "#EF4444" },
+        { "id": "Car Repair", "color": "#EF4444" },
+        { "id": "Misc Expenses", "color": "#EF4444" }
+      ],
+      "links": [
+        { "source": "Unplanned", "target": "Medical Emergency", "value": 4500 },
+        { "source": "Unplanned", "target": "Car Repair", "value": 3000 },
+        { "source": "Unplanned", "target": "Misc Expenses", "value": 2500 }
+      ]
+    }
+  },
   "summary": {
     "totalIn": 168000,
     "totalOut": 135000,
