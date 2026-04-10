@@ -144,7 +144,7 @@ export function CashflowPage() {
     : 0;
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#0B0C0E] overflow-y-auto p-[32px] gap-[16px] scrollbar-hide">
+    <div className="flex-1 flex flex-col h-full bg-[#0B0C0E] overflow-y-auto p-[32px] gap-[32px] scrollbar-hide">
 
       {/* Overview Cards Row */}
       <div className="flex gap-[16px] w-full shrink-0">
@@ -156,7 +156,7 @@ export function CashflowPage() {
               color={activeCategoryColor!}
               icon={ZoomIn}
             />
-            <div className="bg-[#191b1f] border border-[#2e2f33] rounded-[16px] px-[20px] py-[16px] flex-1 flex items-center gap-[16px]">
+            <div className="bg-[#191b1f] border border-[#2e2f33] rounded-[12px] px-[20px] py-[16px] flex-1 flex items-center gap-[16px]">
               <div className="size-[44px] rounded-[10px] bg-[#101214] border border-[#2e2f33] flex items-center justify-center shrink-0">
                 <Activity size={20} color="#606980" />
               </div>
@@ -170,7 +170,7 @@ export function CashflowPage() {
                 </p>
               </div>
             </div>
-            <div className="bg-[#191b1f] border border-[#2e2f33] rounded-[16px] px-[20px] py-[16px] flex-1 flex items-center gap-[16px]">
+            <div className="bg-[#191b1f] border border-[#2e2f33] rounded-[12px] px-[20px] py-[16px] flex-1 flex items-center gap-[16px]">
               <div className="size-[44px] rounded-[10px] bg-[#101214] border border-[#2e2f33] flex items-center justify-center shrink-0">
                 <TrendingDown size={20} color="#717784" />
               </div>
