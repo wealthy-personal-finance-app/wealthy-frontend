@@ -1,16 +1,25 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { X } from 'lucide-react';
 
 interface AuthCenteredLayoutProps {
   children: React.ReactNode;
   showSignUpLink?: boolean;
+  maxWidth?: string;
+  showCloseButton?: boolean;
 }
 
-export function AuthCenteredLayout({ children, showSignUpLink = true }: AuthCenteredLayoutProps) {
+export function AuthCenteredLayout({ 
+  children, 
+  showSignUpLink = true,
+  maxWidth = "500px",
+  showCloseButton = false
+}: AuthCenteredLayoutProps) {
+  const navigate = useNavigate();
+
   return (
-    <div className="min-h-screen w-full bg-[#191b1f] flex flex-col p-4">
-      {/* Worksheet Container - Following Figma's full-width/height approach with minor padding */}
-      <div className="flex-1 flex flex-col bg-[#141414] rounded-[8px] overflow-hidden relative border border-[#2e2f33]/30 w-full">
+    <div className="min-h-screen w-full bg-[#141414] flex flex-col">
+      {/* Main Container */}
+      <div className="flex-1 flex flex-col bg-[#141414] relative w-full">
         
         {/* Header */}
         <header className="w-full flex items-center justify-between p-6 md:px-8">
@@ -50,16 +59,26 @@ export function AuthCenteredLayout({ children, showSignUpLink = true }: AuthCent
             </div>
             <span style={{ color: 'var(--text-white-0, #FFF)', fontSize: '24px', fontWeight: 600, lineHeight: '31.2px', fontFamily: 'Inter Tight, sans-serif' }}>Wealthy</span>
           </div>
-          {showSignUpLink && (
-            <div className="hidden sm:block text-[14px] font-medium text-[#717784]">
-              Don't have an account? <Link to="/sign-up" className="text-[#064e3b] hover:text-[#0ea572] transition-colors">Sign Up</Link>
-            </div>
-          )}
+          <div className="flex items-center gap-4">
+            {showSignUpLink && (
+              <div className="hidden sm:block text-[14px] font-medium text-[#717784]">
+                Don't have an account? <Link to="/sign-up" className="text-[#10B981] hover:text-[#0ea572] transition-colors">Sign Up</Link>
+              </div>
+            )}
+            {showCloseButton && (
+              <button 
+                onClick={() => navigate('/dashboard')}
+                className="size-[32px] rounded-full border border-[#2e2f33] flex items-center justify-center text-[#717784] hover:text-white hover:bg-white/5 transition-all"
+              >
+                <X size={18} />
+              </button>
+            )}
+          </div>
         </header>
 
         {/* Main Content Area - Form centered inside the full-screen worksheet */}
-        <main className="flex-1 flex flex-col items-center justify-center px-6 py-12">
-          <div className="w-full max-w-[500px]">
+        <main className="flex-1 flex flex-col items-center justify-start px-6 py-8 md:py-12">
+          <div className="w-full" style={{ maxWidth }}>
             {children}
           </div>
         </main>

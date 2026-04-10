@@ -9,6 +9,9 @@ import { AddTransactionModal } from './components/transactions/AddTransactionMod
 import { AddNewAutopilotDrawer } from './components/transactions/AddNewAutopilotDrawer';
 import { Dashboard } from './components/dashboard/Dashboard';
 import { CashflowPage } from './components/cashflow/CashflowPage';
+import { ProfileSettings } from './components/profile/ProfileSettings';
+import { PlanSelection } from './components/profile/PlanSelection';
+import { AppSettings } from './components/settings/AppSettings';
 import { toast } from 'sonner';
 
 // Mock data - replace with API calls
@@ -189,8 +192,25 @@ const mockChatLinks = [
   { id: 'chat-7', label: 'How to start an emergency fund' },
 ];
 
+import { useLocation, useNavigate } from 'react-router-dom';
+
 export default function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [activeSidebarLink, setActiveSidebarLink] = useState('dashboard');
+
+  useEffect(() => {
+    const path = location.pathname.split('/')[1] || 'dashboard';
+    const validLinks = ['dashboard', 'ai-assistant', 'cash-flow', 'transactions', 'settings', 'plans', 'billing', 'profile'];
+    if (validLinks.includes(path)) {
+      if (path === 'billing') {
+        setActiveSidebarLink('settings');
+      } else {
+        setActiveSidebarLink(path);
+      }
+    }
+  }, [location]);
+
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false);
   const [isAddAutopilotOpen, setIsAddAutopilotOpen] = useState(false);
 
@@ -211,8 +231,12 @@ export default function App() {
   }, []);
 
   const handleSidebarLinkClick = (linkId: string) => {
+    const allLinks = [...mockSidebarLinks.main, ...mockSidebarLinks.secondary, ...mockSidebarLinks.bottom];
+    const link = allLinks.find(l => l.id === linkId);
+    if (link) {
+      navigate(link.href);
+    }
     setActiveSidebarLink(linkId);
-    console.log('Navigate to:', linkId);
   };
 
   const handleAddTransaction = () => {
@@ -274,6 +298,10 @@ export default function App() {
           <Dashboard />
         ) : activeSidebarLink === 'cash-flow' ? (
           <CashflowPage />
+        ) : activeSidebarLink === 'settings' ? (
+          <AppSettings />
+        ) : activeSidebarLink === 'profile' ? (
+          <ProfileSettings />
         ) : (
           <TransactionsPage
             transactionGroups={mockTransactionGroups}
