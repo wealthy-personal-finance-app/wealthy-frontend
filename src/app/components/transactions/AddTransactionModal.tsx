@@ -1,69 +1,60 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChevronRight, Search, Plus, Calendar as CalendarIcon, ChevronDown, ChevronLeft, Check, X } from 'lucide-react';
-import { TransactionType } from './HistoryView';
 import { CategoryIcon } from './CategoryIcon';
 import { toast } from 'sonner';
 
 export interface CategoryData {
   id: string;
+  _id?: string;
   label: string;
-  icon: string; // We'll map icons simply by name strings for now
+  icon: string;
   masterCategory: string;
+  transactionType?: string;
 }
 
-export const initialExpenseCategories: CategoryData[] = [
-  { id: 'housing', label: 'Housing', icon: 'house', masterCategory: 'Essential Living' },
-  { id: 'food', label: 'Food & Dining', icon: 'coffee', masterCategory: 'Essential Living' },
-  { id: 'transportation', label: 'Transportation', icon: 'bus', masterCategory: 'Essential Living' },
-  { id: 'utilities', label: 'Utilities', icon: 'zap', masterCategory: 'Essential Living' },
-  { id: 'debt', label: 'Debt Payments', icon: 'credit-card', masterCategory: 'Obligations & Liabilities' },
-  { id: 'insurance', label: 'Insurance', icon: 'shield', masterCategory: 'Obligations & Liabilities' },
-  { id: 'taxes', label: 'Taxes', icon: 'taxes', masterCategory: 'Obligations & Liabilities' },
-  { id: 'entertainment', label: 'Entertainment', icon: 'film', masterCategory: 'Discretionary & Lifestyle' },
-  { id: 'shopping', label: 'Shopping', icon: 'shopping-cart', masterCategory: 'Discretionary & Lifestyle' },
-  { id: 'travel', label: 'Travel & Vacations', icon: 'plane', masterCategory: 'Discretionary & Lifestyle' },
-  { id: 'health', label: 'Health & Personal Care', icon: 'heart', masterCategory: 'Discretionary & Lifestyle' },
-  { id: 'education', label: 'Education', icon: 'book', masterCategory: 'Growth & Giving' },
-  { id: 'charity', label: 'Charity & Gifts', icon: 'gift', masterCategory: 'Growth & Giving' },
-  { id: 'emergencies', label: 'Emergencies', icon: 'alert-triangle', masterCategory: 'Unplanned' },
-  { id: 'misc', label: 'Miscellaneous', icon: 'more-horizontal', masterCategory: 'Unplanned' }
-];
+export const initialExpenseCategories: CategoryData[] = [];
+export const initialIncomeCategories: CategoryData[] = [];
+export const initialAssetCategories: CategoryData[] = [];
+export const initialLiabilityCategories: CategoryData[] = [];
 
-export const initialIncomeCategories: CategoryData[] = [
-  { id: 'salary', label: 'Salary/Wages', icon: 'wallet', masterCategory: 'Earned Income' },
-  { id: 'bonus', label: 'Bonuses & Commissions', icon: 'award', masterCategory: 'Earned Income' },
-  { id: 'freelance', label: 'Freelance/Side Hustle', icon: 'briefcase', masterCategory: 'Earned Income' },
-  { id: 'rental-income', label: 'Rental Income', icon: 'home', masterCategory: 'Passive Income' },
-  { id: 'dividends', label: 'Dividends & Interest', icon: 'trending-up', masterCategory: 'Passive Income' },
-  { id: 'capital-gains', label: 'Capital Gains', icon: 'bar-chart-2', masterCategory: 'Portfolio Income' },
-  { id: 'gifts-income', label: 'Gifts & Inheritances', icon: 'gift', masterCategory: 'Other Income' },
-  { id: 'refunds', label: 'Refunds/Reimbursements', icon: 'refresh-ccw', masterCategory: 'Other Income' }
-];
+// Helper to assign an icon to database categories
+function getIconForCategoryLabel(label: string): string {
+  const lower = label.toLowerCase();
+  if (lower.includes('hous') || lower.includes('rent') || lower.includes('mortgage')) return 'house';
+  if (lower.includes('food') || lower.includes('din')) return 'coffee';
+  if (lower.includes('transport') || lower.includes('car') || lower.includes('gas')) return 'bus';
+  if (lower.includes('util')) return 'zap';
+  if (lower.includes('debt') || lower.includes('card') || lower.includes('loan')) return 'credit-card';
+  if (lower.includes('insur')) return 'shield';
+  if (lower.includes('tax')) return 'taxes';
+  if (lower.includes('entertain') || lower.includes('movie')) return 'film';
+  if (lower.includes('shop')) return 'shopping-cart';
+  if (lower.includes('travel') || lower.includes('vacation')) return 'plane';
+  if (lower.includes('health') || lower.includes('care')) return 'heart';
+  if (lower.includes('edu')) return 'book';
+  if (lower.includes('charity') || lower.includes('gift')) return 'gift';
+  if (lower.includes('salary') || lower.includes('wage')) return 'wallet';
+  if (lower.includes('bank') || lower.includes('save') || lower.includes('cash')) return 'landmark';
+  if (lower.includes('stock') || lower.includes('invest') || lower.includes('crypto')) return 'trending-up';
+  return 'star';
+}
 
-export const initialAssetCategories: CategoryData[] = [
-  { id: 'cash', label: 'Cash & Equivalents', icon: 'dollar-sign', masterCategory: 'Liquid Assets' },
-  { id: 'bank', label: 'Bank Accounts', icon: 'landmark', masterCategory: 'Liquid Assets' },
-  { id: 'stocks', label: 'Stocks', icon: 'trending-up', masterCategory: 'Investments' },
-  { id: 'retirement', label: 'Retirement Accounts', icon: 'calendar', masterCategory: 'Investments' },
-  { id: 'primary-residence', label: 'Primary Residence', icon: 'home', masterCategory: 'Real Estate' },
-  { id: 'rental-prop', label: 'Rental Properties', icon: 'key', masterCategory: 'Real Estate' },
-  { id: 'vehicles', label: 'Vehicles', icon: 'car', masterCategory: 'Personal Property' }
-];
-
-export const initialLiabilityCategories: CategoryData[] = [
-  { id: 'credit-cards', label: 'Credit Cards', icon: 'credit-card', masterCategory: 'Short-Term Liabilities' },
-  { id: 'personal-loans', label: 'Personal Loans', icon: 'file-text', masterCategory: 'Short-Term Liabilities' },
-  { id: 'mortgages', label: 'Mortgages', icon: 'home', masterCategory: 'Long-Term Liabilities' },
-  { id: 'student-loans', label: 'Student Loans', icon: 'book', masterCategory: 'Long-Term Liabilities' },
-  { id: 'auto-loans', label: 'Auto Loans', icon: 'car', masterCategory: 'Long-Term Liabilities' }
-];
-
-const masterCategoryOptions = [
+const fallbackMasterCategories = [
   'Essential Living',
   'Obligations & Liabilities',
   'Discretionary & Lifestyle',
   'Growth & Giving',
-  'Unplanned'
+  'Unplanned',
+  'Earned Income',
+  'Passive Income',
+  'Portfolio Income',
+  'Other Income',
+  'Liquid Assets',
+  'Investments',
+  'Real Estate',
+  'Personal Property',
+  'Short-Term Liabilities',
+  'Long-Term Liabilities'
 ];
 
 type AllowedTypes = 'Expense' | 'Income' | 'Asset' | 'Liability';
@@ -84,14 +75,21 @@ export function AddTransactionModal({ onClose, onSave }: AddTransactionModalProp
   const [searchQuery, setSearchQuery] = useState('');
   const [isCategoryOpen, setIsCategoryOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [viewDate, setViewDate] = useState(new Date()); // For calendar navigation
+  const [viewDate, setViewDate] = useState(new Date()); 
 
   // Category view inside dropdown
   const [categoryViewState, setCategoryViewState] = useState<'list' | 'create'>('list');
   const [newCategoryLabel, setNewCategoryLabel] = useState('');
   const [selectedMasterCategory, setSelectedMasterCategory] = useState<string | null>(null);
 
-  // Focus ref for amount input
+  // Database Category States
+  const [allExpenseCats, setAllExpenseCats] = useState<CategoryData[]>([]);
+  const [allIncomeCats, setAllIncomeCats] = useState<CategoryData[]>([]);
+  const [allAssetCats, setAllAssetCats] = useState<CategoryData[]>([]);
+  const [allLiabilityCats, setAllLiabilityCats] = useState<CategoryData[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+
+  // Focus ref for inputs
   const amountInputRef = useRef<HTMLInputElement>(null);
   const calendarRef = useRef<HTMLDivElement>(null);
   const categoryRef = useRef<HTMLDivElement>(null);
@@ -110,7 +108,7 @@ export function AddTransactionModal({ onClose, onSave }: AddTransactionModalProp
       setTimeout(() => {
         categoryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         categorySearchRef.current?.focus();
-      }, 300); // Slightly longer delay to allow modal layout to settle
+      }, 300);
     }
   }, [isCategoryOpen]);
 
@@ -137,59 +135,140 @@ export function AddTransactionModal({ onClose, onSave }: AddTransactionModalProp
     };
   }, [isCalendarOpen, isCategoryOpen]);
 
-  // Derived Categories based on type
-  const [allExpenseCats, setAllExpenseCats] = useState(initialExpenseCategories);
-  const [allIncomeCats, setAllIncomeCats] = useState(initialIncomeCategories);
-  const [allAssetCats, setAllAssetCats] = useState(initialAssetCategories);
-  const [allLiabilityCats, setAllLiabilityCats] = useState(initialLiabilityCategories);
+  // Fetch Categories from Database
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const token = localStorage.getItem('wealthy_token');
+        const res = await fetch('http://localhost:5000/api/transactions/categories', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (res.ok) {
+          const result = await res.json();
+          const nestedData = result.data || {};
 
+          const flattenCategories = (typeKey: string): CategoryData[] => {
+            const flatList: CategoryData[] = [];
+            const typeGroup = nestedData[typeKey];
+            
+            if (typeGroup) {
+              Object.keys(typeGroup).forEach((masterCat) => {
+                const subCats = typeGroup[masterCat];
+                if (Array.isArray(subCats)) {
+                  subCats.forEach((subCatLabel: string) => {
+                    flatList.push({
+                      id: subCatLabel.toLowerCase().replace(/\s+/g, '-'),
+                      label: subCatLabel,
+                      icon: getIconForCategoryLabel(subCatLabel),
+                      masterCategory: masterCat,
+                      transactionType: typeKey
+                    });
+                  });
+                }
+              });
+            }
+            return flatList;
+          };
+
+          setAllExpenseCats(flattenCategories('expense'));
+          setAllIncomeCats(flattenCategories('income'));
+          setAllAssetCats(flattenCategories('asset'));
+          setAllLiabilityCats(flattenCategories('liability'));
+        }
+      } catch (error) {
+        console.error("Failed to load categories:", error);
+      } finally {
+        setIsLoadingCategories(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
+
+  // Derived Categories based on type
   const currentCategories =
     transactionType === 'Expense' ? allExpenseCats :
       transactionType === 'Income' ? allIncomeCats :
         transactionType === 'Asset' ? allAssetCats :
           allLiabilityCats;
 
+  // Dynamic Master Categories based on DB
+  const dynamicMasterCategories = Array.from(new Set(currentCategories.map(c => c.masterCategory)));
+  const activeMasterCategoryOptions = dynamicMasterCategories.length > 0 ? dynamicMasterCategories : fallbackMasterCategories;
+
   // Filter Categories
   const filteredCategories = currentCategories.filter(c =>
     c.label.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleCreateCategory = (masterCat: string) => {
+  const handleCreateCategory = async (masterCat: string) => {
     const label = newCategoryLabel || searchQuery;
     if (!label) return;
 
-    const newCat: CategoryData = {
-      id: label.toLowerCase().replace(/\s+/g, '-'),
-      label: label,
-      icon: 'star',
-      masterCategory: masterCat
+    // --- EXACTLY MATCH BACKEND SCHEMA ---
+    const payload = {
+      type: transactionType.toLowerCase(),
+      parentCategory: masterCat,
+      subCategory: label
     };
 
-    if (transactionType === 'Expense') setAllExpenseCats([...allExpenseCats, newCat]);
-    else if (transactionType === 'Income') setAllIncomeCats([...allIncomeCats, newCat]);
-    else if (transactionType === 'Asset') setAllAssetCats([...allAssetCats, newCat]);
-    else setAllLiabilityCats([...allLiabilityCats, newCat]);
+    try {
+      const token = localStorage.getItem('wealthy_token');
+      const res = await fetch('http://localhost:5000/api/transactions/categories', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
 
-    setCategory(newCat.label);
-    setCategoryViewState('list');
-    setIsCategoryOpen(false);
-    setSearchQuery('');
-    toast.success(`Category "${label}" created successfully`);
+      if (res.ok) {
+        // Build the local object so the UI updates without a refresh
+        const newCat: CategoryData = {
+          id: label.toLowerCase().replace(/\s+/g, '-'),
+          label: label,
+          icon: getIconForCategoryLabel(label),
+          masterCategory: masterCat,
+          transactionType: transactionType.toLowerCase()
+        };
+
+        if (transactionType === 'Expense') setAllExpenseCats([...allExpenseCats, newCat]);
+        else if (transactionType === 'Income') setAllIncomeCats([...allIncomeCats, newCat]);
+        else if (transactionType === 'Asset') setAllAssetCats([...allAssetCats, newCat]);
+        else setAllLiabilityCats([...allLiabilityCats, newCat]);
+
+        setCategory(newCat.label);
+        setCategoryViewState('list');
+        setIsCategoryOpen(false);
+        setSearchQuery('');
+        toast.success(`Category "${label}" created successfully`);
+      } else {
+        const errData = await res.json();
+        toast.error(`Failed: ${errData.message}`);
+      }
+    } catch (error) {
+      console.error("Error creating category:", error);
+      toast.error("Network error creating category.");
+    }
   };
 
   const handleFinalSave = () => {
+    const selectedCat = currentCategories.find(c => c.label === category || c.id === category || c._id === category);
+
     const payload = {
-      type: transactionType,
-      amount,
+      type: transactionType.toLowerCase(), 
+      amount: Number(amount), 
       name: transactionName,
-      category: category,
-      date,
-      note
+      parentCategory: selectedCat?.masterCategory || 'Uncategorized',
+      subCategory: selectedCat?.label || category || 'General',
+      date: new Date(date).toISOString(), 
+      note: note ? `${transactionName} - ${note}` : transactionName 
     };
     onSave(payload);
   };
 
-  // Close when clicking outside (simple backdrop)
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
       onClose();
@@ -347,7 +426,9 @@ export function AddTransactionModal({ onClose, onSave }: AddTransactionModalProp
                       </div>
                       
                       <div className="w-full flex-col flex max-h-[260px] overflow-y-auto scrollbar-hide">
-                        {filteredCategories.length > 0 ? (
+                        {isLoadingCategories ? (
+                          <div className="py-4 text-center text-[#717784] text-[13px]">Loading categories from database...</div>
+                        ) : filteredCategories.length > 0 ? (
                           <>
                             {Object.entries(
                               filteredCategories.reduce((acc, cat) => {
@@ -388,17 +469,19 @@ export function AddTransactionModal({ onClose, onSave }: AddTransactionModalProp
                               </div>
                             ))}
                             {searchQuery === '' && (
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setNewCategoryLabel('');
-                                  setCategoryViewState('create');
-                                }}
-                                className="flex items-center gap-[4px] mt-[12px] px-[8px] py-[4px] text-white hover:opacity-80 transition-opacity font-['Inter_Tight',sans-serif] font-medium text-[14px]"
-                              >
-                                <span>Create New Category</span>
-                                <ChevronRight size={16} />
-                              </button>
+                              <div className="flex justify-start px-[8px] py-[4px] mt-[8px]">
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setNewCategoryLabel('');
+                                    setCategoryViewState('create');
+                                  }}
+                                  className="flex items-center gap-[4px] mt-[12px] px-[8px] py-[4px] text-white hover:opacity-80 transition-opacity font-['Inter_Tight',sans-serif] font-medium text-[14px]"
+                                >
+                                  <span>Create New Category</span>
+                                  <ChevronRight size={16} className="text-white" />
+                                </button>
+                              </div>
                             )}
                           </>
                         ) : (
@@ -443,7 +526,7 @@ export function AddTransactionModal({ onClose, onSave }: AddTransactionModalProp
                           Choose Main Category
                         </label>
                         <div className="flex flex-col gap-[2px] max-h-[160px] overflow-y-auto scrollbar-hide border border-[#2e2f33] rounded-[8px] bg-[#131417] p-[4px] shadow-inner">
-                          {masterCategoryOptions.map((masterOpt) => (
+                          {activeMasterCategoryOptions.map((masterOpt) => (
                             <button
                               key={masterOpt}
                               onClick={(e) => {

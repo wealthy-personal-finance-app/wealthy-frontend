@@ -3,7 +3,7 @@ import svgPaths from "../../../imports/TransactionsAutopilotBase-1/svg-l3wrwsdhj
 import { AutopilotFlow, AutopilotRow } from './AutopilotRow';
 
 export interface AutopilotFlowGroup {
-  frequency: 'monthly' | 'weekly' | 'daily';
+  frequency: 'monthly' | 'weekly' | 'daily' | 'yearly';
   label: string;
   flows: AutopilotFlow[];
 }
@@ -14,6 +14,7 @@ interface AutopilotBaseViewProps {
   onNewFlowClick?: () => void;
   onFlowToggle?: (flowId: string, enabled: boolean) => void;
   onFlowClick?: (flowId: string) => void;
+  onAutopilotRefresh?: () => void; // <--- ADDED PROP
 }
 
 function PlusIcon() {
@@ -22,7 +23,13 @@ function PlusIcon() {
       <div className="absolute inset-[8.33%]">
         <div className="absolute inset-[-4.55%]">
           <svg className="block size-full" fill="none" preserveAspectRatio="none" viewBox="0 0 18 18">
-            <path d={svgPaths.p253fc100} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
+            <path 
+              d="M9 3.75V14.25M3.75 9H14.25" 
+              stroke="currentColor" 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth="1.5" 
+            />
           </svg>
         </div>
       </div>
@@ -50,6 +57,7 @@ export function AutopilotBaseView({
   onNewFlowClick,
   onFlowToggle,
   onFlowClick,
+  onAutopilotRefresh // <--- DESTRUCTURED PROP
 }: AutopilotBaseViewProps) {
   const [expandedFlowId, setExpandedFlowId] = useState<string | null>(null);
 
@@ -66,11 +74,11 @@ export function AutopilotBaseView({
         {totalSavings !== undefined && (
           <div className="flex-1">
             <p style={{ fontFamily: 'var(--font-family)', fontSize: '14px', lineHeight: '21px', color: '#94a3b8' }}>
-              You have{' '}
+              {/* You have{' '}
               <span style={{ fontFamily: 'var(--font-family)', fontSize: '14px', fontWeight: 600, color: '#40c4aa' }}>
                 LKR {totalSavings.toLocaleString()}
-              </span>
-              {' '}on autopilot this month.
+              </span> */}
+              {/* {' '}on autopilot this month. */}
             </p>
           </div>
         )}
@@ -136,6 +144,7 @@ export function AutopilotBaseView({
                       isExpanded={expandedFlowId === flow.id}
                       onToggle={onFlowToggle}
                       onClick={handleFlowClick}
+                      onAutopilotRefresh={onAutopilotRefresh} // <--- PASSED TO ROW
                     />
                   ))}
                 </div>
