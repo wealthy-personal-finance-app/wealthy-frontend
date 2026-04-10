@@ -42,7 +42,7 @@ const DRILLABLE_NODES = new Set([
 
 function StatCard({ label, value, color, icon: Icon }: { label: string; value: number; color: string; icon: any }) {
   return (
-    <div className="bg-[#151718] border border-[#2e2f33] rounded-[16px] p-[20px] flex-1 flex flex-col gap-[12px]">
+    <div className="bg-[#191b1f] border border-[#2e2f33] rounded-[16px] p-[20px] flex-1 flex flex-col gap-[12px]">
       <div className="flex items-center gap-[8px]">
         <div className="size-[32px] rounded-[8px] flex items-center justify-center bg-white/[0.03] border border-white/[0.03]">
           <Icon size={18} color={color} />

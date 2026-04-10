@@ -9,7 +9,6 @@ import { AddTransactionModal } from './components/transactions/AddTransactionMod
 import { AddNewAutopilotDrawer } from './components/transactions/AddNewAutopilotDrawer';
 import { Dashboard } from './components/dashboard/Dashboard';
 import { CashflowPage } from './components/cashflow/CashflowPage';
-import { Toaster } from './components/ui/sonner';
 import { toast } from 'sonner';
 
 // Mock data - replace with API calls
@@ -303,7 +302,6 @@ export default function App() {
           <AddNewAutopilotDrawer onClose={() => setIsAddAutopilotOpen(false)} />
         )}
       </MainLayout>
-      <Toaster position="bottom-center" expand={false} richColors />
     </>
   );
 }

@@ -13,6 +13,11 @@
   --font-weight-medium: 500;
   --font-weight-normal: 400;
 
+  /* Text Colors */
+  --text-white-0: #FFF;
+  --text-sub-500: #717784;
+  --Darkmode-Text-Strong: #FFF;
+
   /* The default background color for the application. */
   --background: rgba(245, 245, 245, 1.00);
   /* The default color for elements or text that appears on top of the background. */
