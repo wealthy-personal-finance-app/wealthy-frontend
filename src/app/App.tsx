@@ -289,7 +289,7 @@ export default function App() {
         )}
 
         {isAddTransactionOpen && (
-          <AddTransactionModal 
+          <AddTransactionModal
             onClose={() => setIsAddTransactionOpen(false)}
             onSave={(data) => {
               console.log('Saved transaction payload:', data);

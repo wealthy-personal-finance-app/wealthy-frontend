@@ -1,14 +1,14 @@
 {
   "nodes": [
-    { "id": "Active Income", "color": "#22C55E", "cluster": "income" },
-    { "id": "Asset Income", "color": "#22C55E", "cluster": "income" },
-    { "id": "Other Income", "color": "#22C55E", "cluster": "income" },
-    { "id": "Total Cash Flow", "color": "#5A6B89", "cluster": "hub" },
-    { "id": "Essential Living", "color": "#F43F5E", "cluster": "expenses" },
-    { "id": "Obligations & Liabilities", "color": "#F43F5E", "cluster": "expenses" },
-    { "id": "Discretionary & Lifestyle", "color": "#F43F5E", "cluster": "expenses" },
+    { "id": "Active Income", "color": "#10B981", "cluster": "income" },
+    { "id": "Asset Income", "color": "#10B981", "cluster": "income" },
+    { "id": "Other Income", "color": "#10B981", "cluster": "income" },
+    { "id": "Total Cash Flow", "color": "#606980", "cluster": "hub" },
+    { "id": "Essential Living", "color": "#EF4444", "cluster": "expenses" },
+    { "id": "Obligations & Liabilities", "color": "#EF4444", "cluster": "expenses" },
+    { "id": "Discretionary & Lifestyle", "color": "#EF4444", "cluster": "expenses" },
     { "id": "Growth & Giving", "color": "#10B981", "cluster": "wealth" },
-    { "id": "Unplanned", "color": "#4B5563", "cluster": "wealth" }
+    { "id": "Unplanned", "color": "#EF4444", "cluster": "wealth" }
   ],
   "links": [
     { "source": "Active Income", "target": "Total Cash Flow", "value": 120000 },
