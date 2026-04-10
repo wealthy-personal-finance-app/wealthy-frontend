@@ -6,6 +6,7 @@ import { TransactionGroup } from './components/transactions/HistoryView';
 import { AutopilotFlowGroup } from './components/transactions/AutopilotBaseView';
 import { FilterState } from './components/transactions/FilterMenu';
 import { AddTransactionModal } from './components/transactions/AddTransactionModal';
+import { AddNewAutopilotDrawer } from './components/transactions/AddNewAutopilotDrawer';
 import { Dashboard } from './components/dashboard/Dashboard';
 import { CashflowPage } from './components/cashflow/CashflowPage';
 import { Toaster } from './components/ui/sonner';
@@ -192,6 +193,7 @@ const mockChatLinks = [
 export default function App() {
   const [activeSidebarLink, setActiveSidebarLink] = useState('dashboard');
   const [isAddTransactionOpen, setIsAddTransactionOpen] = useState(false);
+  const [isAddAutopilotOpen, setIsAddAutopilotOpen] = useState(false);
 
   useEffect(() => {
     const handleGlobalFocus = (e: FocusEvent) => {
@@ -228,7 +230,7 @@ export default function App() {
   };
 
   const handleNewAutopilotFlowClick = () => {
-    console.log('New autopilot flow clicked');
+    setIsAddAutopilotOpen(true);
   };
 
   const handleAutopilotFlowToggle = (flowId: string, enabled: boolean) => {
