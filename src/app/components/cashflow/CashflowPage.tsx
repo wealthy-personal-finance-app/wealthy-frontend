@@ -42,17 +42,16 @@ const DRILLABLE_NODES = new Set([
 
 function StatCard({ label, value, color, icon: Icon }: { label: string; value: number; color: string; icon: any }) {
   return (
-    <div className="bg-[#191b1f] border border-[#2e2f33] rounded-[12px] px-[20px] py-[16px] flex-1 flex items-center gap-[16px]">
-      <div className="size-[44px] rounded-[10px] bg-[#101214] border border-[#2e2f33] flex items-center justify-center shrink-0">
-        <Icon size={20} color={color} />
+    <div className="bg-[#151718] border border-[#2e2f33] rounded-[16px] p-[20px] flex-1 flex flex-col gap-[12px]">
+      <div className="flex items-center gap-[8px]">
+        <div className="size-[32px] rounded-[8px] flex items-center justify-center bg-white/[0.03] border border-white/[0.03]">
+          <Icon size={18} color={color} />
+        </div>
+        <p className="text-[#99a0ae] text-[14px] font-medium font-['Inter_Tight',sans-serif]">{label}</p>
       </div>
-      <div className="flex flex-col gap-[4px]">
-        <p className="text-[#717784] text-[13px] font-medium font-['Inter_Tight',sans-serif]">{label}</p>
-        <p className="text-[22px] font-bold font-['Inter_Tight',sans-serif]">
-          <span className="text-white">LKR </span>
-          <span style={{ color }}>{value.toLocaleString()}</span>
-        </p>
-      </div>
+      <p style={{ color }} className="text-[24px] font-bold font-['Inter_Tight',sans-serif]">
+        LKR {value.toLocaleString()}
+      </p>
     </div>
   );
 }
@@ -145,7 +144,7 @@ export function CashflowPage() {
     : 0;
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-y-auto p-[32px] gap-[16px] scrollbar-hide">
+    <div className="flex-1 flex flex-col h-full bg-[#0B0C0E] overflow-y-auto p-[32px] gap-[32px] scrollbar-hide">
 
       {/* Overview Cards Row */}
       <div className="flex gap-[16px] w-full shrink-0">
@@ -201,7 +200,7 @@ export function CashflowPage() {
         {/* Card Header */}
         <div className="flex justify-between items-center mb-[40px] shrink-0">
           <div className="flex flex-col gap-[8px]">
-            {/* Breadcrumb */}
+            {/* breadcrumb */}
             {isDetailView && (
               <button
                 onClick={handleBackToOverview}
@@ -227,11 +226,10 @@ export function CashflowPage() {
 
           <div className="flex items-center gap-[16px]">
             {/* Level badge */}
-            <div className={`px-[10px] py-[4px] rounded-full text-[11px] font-semibold font-['Inter_Tight',sans-serif] border transition-all ${
-              isDetailView
-                ? 'bg-[#10B981]/10 border-[#10B981]/20 text-[#10B981]'
-                : 'bg-white/[0.03] border-white/[0.06] text-[#717784]'
-            }`}>
+            <div className={`px-[10px] py-[4px] rounded-full text-[11px] font-semibold font-['Inter_Tight',sans-serif] border transition-all ${isDetailView
+              ? 'bg-[#10B981]/10 border-[#10B981]/20 text-[#10B981]'
+              : 'bg-white/[0.03] border-white/[0.06] text-[#717784]'
+              }`}>
               {isDetailView ? 'Level 2 — Detail' : 'Level 1 — Overview'}
             </div>
 
@@ -270,7 +268,7 @@ export function CashflowPage() {
             data={chartData}
             margin={{ top: 20, right: 160, bottom: 20, left: 160 }}
             align="justify"
-            colors={(node: any) => node.color || '#606980'}
+            colors={node => node.color || '#5A6B89'}
             nodeOpacity={1}
             nodeThickness={18}
             nodeInnerPadding={2}
@@ -289,7 +287,7 @@ export function CashflowPage() {
             theme={{
               tooltip: {
                 container: {
-                  background: '#101214',
+                  background: '#15161a',
                   color: '#fff',
                   fontSize: 12,
                   borderRadius: 8,
