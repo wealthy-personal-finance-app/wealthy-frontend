@@ -1,5 +1,7 @@
+import { useEffect, useState, useCallback } from "react";
 import svgPaths from "../../../imports/TransactionsHistory/svg-pq2oaob5wk";
 import imgAvatar from "../../../imports/TransactionsHistory/3bf6d91fffb576176d4a0070882aa4c6d17189e7.png";
+import { Plus } from "lucide-react";
 
 export interface User {
   name: string;
@@ -13,6 +15,106 @@ interface TopbarProps {
   onAddTransaction?: () => void;
   onUserMenuClick?: () => void;
 }
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000";
+const AUTH_PROFILE_ENDPOINT = `${API_BASE_URL}/api/auth/profile`;
+const PAYMENT_PLAN_ENDPOINT = `${API_BASE_URL}/api/payments/subscription`;
+const POSSIBLE_TOKEN_KEYS = ["token", "accessToken", "authToken", "jwt", "wealthyToken"];
+
+function getAuthToken(): string | null {
+  for (const key of POSSIBLE_TOKEN_KEYS) {
+    const token = localStorage.getItem(key);
+    if (token) return token;
+  }
+  return null;
+}
+
+function parseUserProfile(payload: unknown): { name?: string; email?: string } {
+  if (!payload || typeof payload !== "object") return {};
+
+  const root = payload as Record<string, unknown>;
+  const data = root.user && typeof root.user === "object"
+    ? (root.user as Record<string, unknown>)
+    : root;
+
+  const nameCandidate =
+    (typeof data.name === "string" && data.name) ||
+    (typeof data.fullName === "string" && data.fullName) ||
+    (typeof data.username === "string" && data.username) ||
+    "";
+
+  const emailCandidate =
+    (typeof data.email === "string" && data.email) ||
+    (typeof data.mail === "string" && data.mail) ||
+    "";
+
+  return {
+    name: nameCandidate.trim() || undefined,
+    email: emailCandidate.trim() || undefined,
+  };
+}
+
+function extractPlanName(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") return null;
+
+  const root = payload as Record<string, unknown>;
+  const candidates: unknown[] = [
+    root.plan,
+    root.tier,
+    root.badge,
+    root.subscription,
+    root.data,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim().length > 0) {
+      return candidate.trim();
+    }
+
+    if (!candidate || typeof candidate !== "object") continue;
+
+    const item = candidate as Record<string, unknown>;
+    const nested =
+      (typeof item.plan === "string" && item.plan) ||
+      (typeof item.tier === "string" && item.tier) ||
+      (typeof item.name === "string" && item.name) ||
+      (typeof item.status === "string" && item.status) ||
+      "";
+
+    if (nested.trim().length > 0) {
+      return nested.trim();
+    }
+  }
+
+  return null;
+}
+
+async function fetchPaymentPlan(token: string): Promise<string | null | undefined> {
+  
+    try {
+      const response = await fetch(PAYMENT_PLAN_ENDPOINT, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      let payload: unknown = null;
+      try {
+        payload = await response.json();
+      } catch {
+        payload = null;
+      }
+
+      const plan = extractPlanName(payload);
+      if (plan) return plan;
+    } catch {
+      // Try next endpoint candidate.
+    }
+}
+
+ 
+
 
 function ChevronLeftIcon() {
   return (
@@ -57,6 +159,53 @@ function ChevronDownIcon() {
 }
 
 export function Topbar({ user, onAddTransaction, onUserMenuClick }: TopbarProps) {
+  const [displayedUser, setDisplayedUser] = useState<User>(user);
+
+  useEffect(() => {
+    setDisplayedUser(user);
+  }, [user]);
+
+  const loadTopbarUser = useCallback(async () => {
+    const token = getAuthToken();
+    if (!token) {
+      setDisplayedUser(user);
+      return;
+    }
+
+    const [profileResult, planResult] = await Promise.allSettled([
+      fetch(AUTH_PROFILE_ENDPOINT, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }),
+      fetchPaymentPlan(token),
+    ]);
+    
+    let profilePayload: unknown = null;
+    if (profileResult.status === "fulfilled" && profileResult.value.ok) {
+      try {
+        profilePayload = await profileResult.value.json();
+      } catch {
+        profilePayload = null;
+      }
+    }
+
+    const parsedProfile = parseUserProfile(profilePayload);
+    const parsedPlan = planResult.status === "fulfilled" ? planResult.value : null;
+
+    setDisplayedUser((prev) => ({
+      ...prev,
+      name: parsedProfile.name ?? prev.name,
+      email: parsedProfile.email ?? prev.email,
+      badge: parsedPlan ?? prev.badge,
+    }));
+  }, [user]);
+
+  useEffect(() => {
+    void loadTopbarUser();
+  }, [loadTopbarUser]);
+
   return (
     <div className="bg-[#191b1f] border-b border-[#2e2f33] w-full">
       <div className="flex items-center justify-between px-[24px] py-[16px]">
@@ -65,7 +214,7 @@ export function Topbar({ user, onAddTransaction, onUserMenuClick }: TopbarProps)
           onClick={onAddTransaction}
           className="bg-[#065f46] hover:bg-[#047857] transition-colors rounded-[8px] flex items-center gap-[4px] px-[12px] py-[8px]"
         >
-          <PlusIcon />
+          <Plus color="white" />
           <span className="text-white" style={{ fontFamily: 'Inter Tight, sans-serif', fontSize: '16px', lineHeight: '24px', fontWeight: 500 }}>
             Add Transaction
           </span>
@@ -79,8 +228,8 @@ export function Topbar({ user, onAddTransaction, onUserMenuClick }: TopbarProps)
           {/* Avatar */}
           <div className="relative shrink-0 size-[24px] rounded-full overflow-hidden">
             <img 
-              src={user.avatarUrl || imgAvatar} 
-              alt={user.name}
+              src={displayedUser.avatarUrl || imgAvatar} 
+              alt={displayedUser.name}
               className="w-full h-full object-cover"
             />
           </div>
@@ -89,18 +238,18 @@ export function Topbar({ user, onAddTransaction, onUserMenuClick }: TopbarProps)
           <div className="flex flex-col gap-[2px] items-start">
             <div className="flex items-center gap-[4px]">
               <p className="text-white" style={{ fontFamily: 'Inter, sans-serif', fontSize: '11px', lineHeight: 'normal', fontWeight: 500 }}>
-                {user.name}
+                {displayedUser.name}
               </p>
-              {user.badge && (
+              {displayedUser.badge && (
                 <div className="bg-[#047857] rounded-[999px] px-[5px] py-[2px] h-[12px] flex items-center justify-center">
                   <p className="text-white uppercase" style={{ fontFamily: 'Inter, sans-serif', fontSize: '8px', letterSpacing: '0.16px', fontWeight: 500 }}>
-                    {user.badge}
+                    {displayedUser.badge}
                   </p>
                 </div>
               )}
             </div>
             <p className="text-[#717784]" style={{ fontFamily: 'Inter, sans-serif', fontSize: '10px', lineHeight: 'normal' }}>
-              {user.email}
+              {displayedUser.email}
             </p>
           </div>
 

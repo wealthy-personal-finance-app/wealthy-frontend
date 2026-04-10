@@ -1,21 +1,23 @@
-import { ReactNode } from 'react';
-import { Sidebar, SidebarLink, ChatLink } from './Sidebar';
-import { Topbar, User } from './Topbar';
+import {ReactNode} from "react"
+import {Sidebar, SidebarLink, ChatLink} from "./Sidebar"
+import {Topbar, User} from "./Topbar"
 
 interface MainLayoutProps {
-  children: ReactNode;
-  user: User;
+  children: ReactNode
+  user: User
   sidebarLinks: {
-    main: SidebarLink[];
-    secondary?: SidebarLink[];
-    bottom?: SidebarLink[];
-  };
-  chatLinks?: ChatLink[];
-  activeSidebarLink?: string;
-  onSidebarLinkClick?: (linkId: string) => void;
-  onAddTransaction?: () => void;
-  onUserMenuClick?: () => void;
-  onNewChat?: () => void;
+    main: SidebarLink[]
+    secondary?: SidebarLink[]
+    bottom?: SidebarLink[]
+  }
+  chatLinks?: ChatLink[]
+  activeChatId?: string | null
+  activeSidebarLink?: string
+  onSidebarLinkClick?: (linkId: string) => void
+  onAddTransaction?: () => void
+  onUserMenuClick?: () => void
+  onNewChat?: () => void
+  onChatLinkClick?: (chatId: string) => void
 }
 
 export function MainLayout({
@@ -23,11 +25,13 @@ export function MainLayout({
   user,
   sidebarLinks,
   chatLinks,
+  activeChatId,
   activeSidebarLink,
   onSidebarLinkClick,
   onAddTransaction,
   onUserMenuClick,
   onNewChat,
+  onChatLinkClick,
 }: MainLayoutProps) {
   return (
     <div className="flex h-screen w-screen bg-[#191b1f] overflow-hidden">
@@ -37,9 +41,11 @@ export function MainLayout({
         secondaryLinks={sidebarLinks.secondary}
         bottomLinks={sidebarLinks.bottom}
         chatLinks={chatLinks}
+        activeChatId={activeChatId}
         activeLink={activeSidebarLink}
         onLinkClick={onSidebarLinkClick}
         onNewChat={onNewChat}
+        onChatClick={onChatLinkClick}
       />
 
       {/* Main Content Area */}
@@ -52,13 +58,11 @@ export function MainLayout({
             onAddTransaction={onAddTransaction}
             onUserMenuClick={onUserMenuClick}
           />
-          
+
           {/* Content */}
-          <main className="flex-1 overflow-auto relative">
-            {children}
-          </main>
+          <main className="flex-1 overflow-auto relative">{children}</main>
         </div>
       </div>
     </div>
-  );
+  )
 }
