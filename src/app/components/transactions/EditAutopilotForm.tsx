@@ -1,263 +1,389 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, Plus, Search, X } from 'lucide-react';
-import { AutopilotFlow, AutopilotIcon } from './AutopilotRow';
-import { CategoryIcon } from './CategoryIcon';
-import { toast } from 'sonner';
+import React, {useEffect, useRef, useState} from "react"
+import {ChevronDown, ChevronRight, Plus, Search, X} from "lucide-react"
+import {AutopilotFlow, AutopilotIcon} from "./AutopilotRow"
+import {CategoryIcon} from "./CategoryIcon"
+import {toast} from "sonner"
+import {getAuthToken} from "../../utils/auth"
+import {apiFetch, apiFetchJson} from "../../apis/client"
+import {ENDPOINTS} from "../../apis/endpoints"
 
 // Define CategoryData locally for this component
 export interface CategoryData {
-  id: string;
-  label: string;
-  icon: string;
-  masterCategory: string;
-  transactionType?: string;
+  id: string
+  label: string
+  icon: string
+  masterCategory: string
+  transactionType?: string
 }
 
 // Helper to assign icons automatically
 function getIconForCategoryLabel(label: string): string {
-  const lower = label.toLowerCase();
-  if (lower.includes('hous') || lower.includes('rent')) return 'house';
-  if (lower.includes('food') || lower.includes('din')) return 'coffee';
-  if (lower.includes('transport') || lower.includes('car')) return 'bus';
-  if (lower.includes('util')) return 'zap';
-  if (lower.includes('debt') || lower.includes('card') || lower.includes('loan')) return 'credit-card';
-  if (lower.includes('insur')) return 'shield';
-  if (lower.includes('shop')) return 'shopping-cart';
-  if (lower.includes('salary') || lower.includes('wage')) return 'wallet';
-  if (lower.includes('stock') || lower.includes('invest')) return 'trending-up';
-  return 'star';
+  const lower = label.toLowerCase()
+  if (lower.includes("hous") || lower.includes("rent")) return "house"
+  if (lower.includes("food") || lower.includes("din")) return "coffee"
+  if (lower.includes("transport") || lower.includes("car")) return "bus"
+  if (lower.includes("util")) return "zap"
+  if (
+    lower.includes("debt") ||
+    lower.includes("card") ||
+    lower.includes("loan")
+  )
+    return "credit-card"
+  if (lower.includes("insur")) return "shield"
+  if (lower.includes("shop")) return "shopping-cart"
+  if (lower.includes("salary") || lower.includes("wage")) return "wallet"
+  if (lower.includes("stock") || lower.includes("invest")) return "trending-up"
+  return "star"
 }
 
 const fallbackMasterCategories = [
-  'Essential Living', 'Obligations & Liabilities', 'Discretionary & Lifestyle', 
-  'Growth & Giving', 'Earned Income', 'Passive Income', 'Liquid Assets', 'Investments'
-];
+  "Essential Living",
+  "Obligations & Liabilities",
+  "Discretionary & Lifestyle",
+  "Growth & Giving",
+  "Earned Income",
+  "Passive Income",
+  "Liquid Assets",
+  "Investments",
+]
 
-function Toggle({ className, active = false }: { className?: string, active?: boolean }) {
+function Toggle({
+  className,
+  active = false,
+}: {
+  className?: string
+  active?: boolean
+}) {
   return (
-    <div className={className || `content-stretch flex h-[20px] items-center p-[2px] relative rounded-[999px] w-[35px] ${active ? 'bg-[#065f46] justify-end' : 'bg-[#e1e4ea] justify-start'}`}>
+    <div
+      className={
+        className ||
+        `content-stretch flex h-[20px] items-center p-[2px] relative rounded-[999px] w-[35px] ${
+          active ? "bg-[#065f46] justify-end" : "bg-[#e1e4ea] justify-start"
+        }`
+      }
+    >
       <div className="relative shrink-0 size-[16px] bg-white rounded-full shadow-sm"></div>
     </div>
-  );
+  )
 }
 
 // NOTE: Added onRefresh prop here!
-export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: AutopilotFlow, onClose?: () => void, onRefresh?: () => void }) {
-  const [isScheduleOpen, setIsScheduleOpen] = useState(false);
-  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
-  const [isDayOpen, setIsDayOpen] = useState(false);
-  const [isMonthOpen, setIsMonthOpen] = useState(false);
+export function EditAutopilotForm({
+  flow,
+  onClose,
+  onRefresh,
+}: {
+  flow: AutopilotFlow
+  onClose?: () => void
+  onRefresh?: () => void
+}) {
+  const [isScheduleOpen, setIsScheduleOpen] = useState(false)
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false)
+  const [isDayOpen, setIsDayOpen] = useState(false)
+  const [isMonthOpen, setIsMonthOpen] = useState(false)
 
-  const toggleDropdown = (dropdown: 'category' | 'schedule' | 'day' | 'month') => {
-    setIsCategoryOpen(dropdown === 'category' ? !isCategoryOpen : false);
-    setIsScheduleOpen(dropdown === 'schedule' ? !isScheduleOpen : false);
-    setIsDayOpen(dropdown === 'day' ? !isDayOpen : false);
-    setIsMonthOpen(dropdown === 'month' ? !isMonthOpen : false);
-    if (dropdown === 'category' && !isCategoryOpen) setCategoryViewState('list');
-  };
+  const toggleDropdown = (
+    dropdown: "category" | "schedule" | "day" | "month"
+  ) => {
+    setIsCategoryOpen(dropdown === "category" ? !isCategoryOpen : false)
+    setIsScheduleOpen(dropdown === "schedule" ? !isScheduleOpen : false)
+    setIsDayOpen(dropdown === "day" ? !isDayOpen : false)
+    setIsMonthOpen(dropdown === "month" ? !isMonthOpen : false)
+    if (dropdown === "category" && !isCategoryOpen) setCategoryViewState("list")
+  }
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [categoryViewState, setCategoryViewState] = useState<'list' | 'assign-master'>('list');
-  const [newCategoryLabel, setNewCategoryLabel] = useState('');
+  const [searchQuery, setSearchQuery] = useState("")
+  const [categoryViewState, setCategoryViewState] = useState<
+    "list" | "assign-master"
+  >("list")
+  const [newCategoryLabel, setNewCategoryLabel] = useState("")
 
-  const categoryRef = useRef<HTMLDivElement>(null);
-  const scheduleRef = useRef<HTMLDivElement>(null);
-  const dayRef = useRef<HTMLDivElement>(null);
-  const monthRef = useRef<HTMLDivElement>(null);
+  const categoryRef = useRef<HTMLDivElement>(null)
+  const scheduleRef = useRef<HTMLDivElement>(null)
+  const dayRef = useRef<HTMLDivElement>(null)
+  const monthRef = useRef<HTMLDivElement>(null)
 
   // Click outside listener
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (isCategoryOpen && categoryRef.current && !categoryRef.current.contains(event.target as Node)) setIsCategoryOpen(false);
-      if (isScheduleOpen && scheduleRef.current && !scheduleRef.current.contains(event.target as Node)) setIsScheduleOpen(false);
-      if (isDayOpen && dayRef.current && !dayRef.current.contains(event.target as Node)) setIsDayOpen(false);
-      if (isMonthOpen && monthRef.current && !monthRef.current.contains(event.target as Node)) setIsMonthOpen(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isCategoryOpen, isScheduleOpen, isDayOpen, isMonthOpen]);
+      if (
+        isCategoryOpen &&
+        categoryRef.current &&
+        !categoryRef.current.contains(event.target as Node)
+      )
+        setIsCategoryOpen(false)
+      if (
+        isScheduleOpen &&
+        scheduleRef.current &&
+        !scheduleRef.current.contains(event.target as Node)
+      )
+        setIsScheduleOpen(false)
+      if (
+        isDayOpen &&
+        dayRef.current &&
+        !dayRef.current.contains(event.target as Node)
+      )
+        setIsDayOpen(false)
+      if (
+        isMonthOpen &&
+        monthRef.current &&
+        !monthRef.current.contains(event.target as Node)
+      )
+        setIsMonthOpen(false)
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [isCategoryOpen, isScheduleOpen, isDayOpen, isMonthOpen])
 
   // Form State
   const [formData, setFormData] = useState({
     flowName: flow.title,
     amount: flow.amount.toString(),
     type: flow.type.charAt(0).toUpperCase() + flow.type.slice(1),
-    category: flow.category || 'Housing',
-    schedule: flow.schedule?.includes('month') ? 'Monthly' : 
-              flow.schedule?.includes('Every') && !flow.schedule?.includes('Day') ? 'Weekly' : 
-              flow.schedule === 'Every Day' ? 'Daily' : 'Yearly',
-    onDay: flow.schedule || '1st day of the month',
-    onMonth: 'January',
-    selectedDays: ['Sun'],
-    note: ''
-  });
+    category: flow.category || "Housing",
+    schedule: flow.schedule?.includes("month")
+      ? "Monthly"
+      : flow.schedule?.includes("Every") && !flow.schedule?.includes("Day")
+      ? "Weekly"
+      : flow.schedule === "Every Day"
+      ? "Daily"
+      : "Yearly",
+    onDay: flow.schedule || "1st day of the month",
+    onMonth: "January",
+    selectedDays: ["Sun"],
+    note: "",
+  })
 
   // DB Category States
-  const [allExpenseCats, setAllExpenseCats] = useState<CategoryData[]>([]);
-  const [allIncomeCats, setAllIncomeCats] = useState<CategoryData[]>([]);
-  const [allAssetCats, setAllAssetCats] = useState<CategoryData[]>([]);
-  const [allLiabilityCats, setAllLiabilityCats] = useState<CategoryData[]>([]);
+  const [allExpenseCats, setAllExpenseCats] = useState<CategoryData[]>([])
+  const [allIncomeCats, setAllIncomeCats] = useState<CategoryData[]>([])
+  const [allAssetCats, setAllAssetCats] = useState<CategoryData[]>([])
+  const [allLiabilityCats, setAllLiabilityCats] = useState<CategoryData[]>([])
 
   // 1. --- GET CATEGORIES FROM DATABASE ---
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const token = localStorage.getItem('wealthy_token');
-        const res = await fetch('http://localhost:5000/api/transactions/categories', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+        const token = getAuthToken()
+        const {response: res, data: result} = await apiFetchJson<any>(
+          ENDPOINTS.transactions.categories,
+          {
+            method: "GET",
+            auth: true,
+          }
+        )
         if (res.ok) {
-          const result = await res.json();
-          const nestedData = result.data || {};
+          const nestedData = result.data || {}
 
           const flatten = (typeKey: string): CategoryData[] => {
-            const flatList: CategoryData[] = [];
+            const flatList: CategoryData[] = []
             if (nestedData[typeKey]) {
               Object.keys(nestedData[typeKey]).forEach((masterCat) => {
-                const subCats = nestedData[typeKey][masterCat];
+                const subCats = nestedData[typeKey][masterCat]
                 if (Array.isArray(subCats)) {
-                  subCats.forEach((sub: string) => flatList.push({
-                    id: sub.toLowerCase().replace(/\s+/g, '-'),
-                    label: sub,
-                    icon: getIconForCategoryLabel(sub),
-                    masterCategory: masterCat,
-                    transactionType: typeKey
-                  }));
+                  subCats.forEach((sub: string) =>
+                    flatList.push({
+                      id: sub.toLowerCase().replace(/\s+/g, "-"),
+                      label: sub,
+                      icon: getIconForCategoryLabel(sub),
+                      masterCategory: masterCat,
+                      transactionType: typeKey,
+                    })
+                  )
                 }
-              });
+              })
             }
-            return flatList;
-          };
-          setAllExpenseCats(flatten('expense'));
-          setAllIncomeCats(flatten('income'));
-          setAllAssetCats(flatten('asset'));
-          setAllLiabilityCats(flatten('liability'));
+            return flatList
+          }
+          setAllExpenseCats(flatten("expense"))
+          setAllIncomeCats(flatten("income"))
+          setAllAssetCats(flatten("asset"))
+          setAllLiabilityCats(flatten("liability"))
         }
-      } catch (error) { console.error(error); }
-    };
-    fetchCategories();
-  }, []);
+      } catch (error) {
+        console.error(error)
+      }
+    }
+    fetchCategories()
+  }, [])
 
   const currentCategories =
-    formData.type === 'Expense' ? allExpenseCats :
-    formData.type === 'Income' ? allIncomeCats :
-    formData.type === 'Asset' ? allAssetCats : allLiabilityCats;
+    formData.type === "Expense"
+      ? allExpenseCats
+      : formData.type === "Income"
+      ? allIncomeCats
+      : formData.type === "Asset"
+      ? allAssetCats
+      : allLiabilityCats
 
-  const dynamicMasterCategories = Array.from(new Set(currentCategories.map(c => c.masterCategory)));
-  const masterCategoryOptions = dynamicMasterCategories.length > 0 ? dynamicMasterCategories : fallbackMasterCategories;
-  
-  const filteredCategories = currentCategories.filter(c => c.label.toLowerCase().includes(searchQuery.toLowerCase()));
+  const dynamicMasterCategories = Array.from(
+    new Set(currentCategories.map((c) => c.masterCategory))
+  )
+  const masterCategoryOptions =
+    dynamicMasterCategories.length > 0
+      ? dynamicMasterCategories
+      : fallbackMasterCategories
+
+  const filteredCategories = currentCategories.filter((c) =>
+    c.label.toLowerCase().includes(searchQuery.toLowerCase())
+  )
   const groupedCategories = filteredCategories.reduce((acc, cat) => {
-    if (!acc[cat.masterCategory]) acc[cat.masterCategory] = [];
-    acc[cat.masterCategory].push(cat);
-    return acc;
-  }, {} as Record<string, CategoryData[]>);
+    if (!acc[cat.masterCategory]) acc[cat.masterCategory] = []
+    acc[cat.masterCategory].push(cat)
+    return acc
+  }, {} as Record<string, CategoryData[]>)
 
   // 2. --- POST NEW CATEGORY TO DATABASE ---
   const handleCreateCategory = async (masterCat: string) => {
-    const label = newCategoryLabel || searchQuery;
-    if (!label) return;
+    const label = newCategoryLabel || searchQuery
+    if (!label) return
 
     const payload = {
       transactionType: formData.type.toLowerCase(),
       label: label,
       icon: getIconForCategoryLabel(label),
-      masterCategory: masterCat
-    };
+      masterCategory: masterCat,
+    }
 
     try {
-      const token = localStorage.getItem('wealthy_token');
-      const res = await fetch('http://localhost:5000/api/transactions/categories', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify(payload)
-      });
+      const token = getAuthToken()
+      const {response: res} = await apiFetchJson(
+        ENDPOINTS.transactions.categories,
+        {
+          method: "POST",
+          auth: true,
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        }
+      )
 
       if (res.ok) {
-        const newCat: CategoryData = { id: label.toLowerCase(), label, icon: payload.icon, masterCategory: masterCat };
-        if (formData.type === 'Expense') setAllExpenseCats([...allExpenseCats, newCat]);
-        else if (formData.type === 'Income') setAllIncomeCats([...allIncomeCats, newCat]);
-        else if (formData.type === 'Asset') setAllAssetCats([...allAssetCats, newCat]);
-        else setAllLiabilityCats([...allLiabilityCats, newCat]);
+        const newCat: CategoryData = {
+          id: label.toLowerCase(),
+          label,
+          icon: payload.icon,
+          masterCategory: masterCat,
+        }
+        if (formData.type === "Expense")
+          setAllExpenseCats([...allExpenseCats, newCat])
+        else if (formData.type === "Income")
+          setAllIncomeCats([...allIncomeCats, newCat])
+        else if (formData.type === "Asset")
+          setAllAssetCats([...allAssetCats, newCat])
+        else setAllLiabilityCats([...allLiabilityCats, newCat])
 
-        setFormData({ ...formData, category: label });
-        setIsCategoryOpen(false);
-        setCategoryViewState('list');
-        setSearchQuery('');
-        toast.success(`Category "${label}" created!`);
+        setFormData({...formData, category: label})
+        setIsCategoryOpen(false)
+        setCategoryViewState("list")
+        setSearchQuery("")
+        toast.success(`Category "${label}" created!`)
       } else {
-        toast.error("Failed to save category to DB");
+        toast.error("Failed to save category to DB")
       }
-    } catch (error) { console.error(error); }
-  };
+    } catch (error) {
+      console.error(error)
+    }
+  }
 
   // 3. --- PATCH AUTOPILOT FLOW ---
   const handleSave = async () => {
     try {
-      const token = localStorage.getItem('wealthy_token');
-      const selectedCat = currentCategories.find(c => c.label === formData.category);
+      const token = getAuthToken()
+      const selectedCat = currentCategories.find(
+        (c) => c.label === formData.category
+      )
 
-      let scheduledDayString = formData.onDay;
-      if (formData.schedule === 'Weekly') scheduledDayString = formData.selectedDays.join(', ');
-      if (formData.schedule === 'Daily') scheduledDayString = 'Every Day';
-      if (formData.schedule === 'Yearly') scheduledDayString = `${formData.onMonth} ${formData.onDay}`;
+      let scheduledDayString = formData.onDay
+      if (formData.schedule === "Weekly")
+        scheduledDayString = formData.selectedDays.join(", ")
+      if (formData.schedule === "Daily") scheduledDayString = "Every Day"
+      if (formData.schedule === "Yearly")
+        scheduledDayString = `${formData.onMonth} ${formData.onDay}`
 
       const payload = {
         flowName: formData.flowName,
         amount: Number(formData.amount),
         type: formData.type.toLowerCase(),
-        parentCategory: selectedCat?.masterCategory || 'Uncategorized',
+        parentCategory: selectedCat?.masterCategory || "Uncategorized",
         subCategory: formData.category,
         frequency: formData.schedule.toLowerCase(),
         scheduledDay: scheduledDayString,
-        note: formData.note
-      };
+        note: formData.note,
+      }
 
-      const res = await fetch(`http://localhost:5000/api/transactions/autopilot/${flow.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify(payload)
-      });
+      const res = await apiFetch(
+        ENDPOINTS.transactions.autopilotById(flow.id),
+        {
+          method: "PATCH",
+          auth: true,
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        }
+      )
 
       if (res.ok) {
-        toast.success(`Changes to "${formData.flowName}" saved!`);
-        onRefresh?.(); // Tell the app to reload
-        onClose?.();
+        toast.success(`Changes to "${formData.flowName}" saved!`)
+        onRefresh?.() // Tell the app to reload
+        onClose?.()
       } else {
-        toast.error("Failed to update Autopilot flow.");
+        toast.error("Failed to update Autopilot flow.")
       }
-    } catch (error) { console.error(error); }
-  };
+    } catch (error) {
+      console.error(error)
+    }
+  }
 
   // 4. --- DELETE AUTOPILOT FLOW ---
   const handleDelete = async () => {
-    if (!window.confirm("Are you sure you want to delete this flow?")) return;
+    if (!window.confirm("Are you sure you want to delete this flow?")) return
     try {
-      const token = localStorage.getItem('wealthy_token');
-      const res = await fetch(`http://localhost:5000/api/transactions/autopilot/${flow.id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const token = getAuthToken()
+      const res = await apiFetch(
+        ENDPOINTS.transactions.autopilotById(flow.id),
+        {
+          method: "DELETE",
+          auth: true,
+        }
+      )
 
       if (res.ok) {
-        toast.error(`Autopilot flow deleted`);
-        onRefresh?.(); // Tell the app to reload
-        onClose?.();
+        toast.error(`Autopilot flow deleted`)
+        onRefresh?.() // Tell the app to reload
+        onClose?.()
       } else {
-        toast.error("Failed to delete flow");
+        toast.error("Failed to delete flow")
       }
-    } catch (error) { console.error(error); }
-  };
+    } catch (error) {
+      console.error(error)
+    }
+  }
 
-  const types = ['Expense', 'Income', 'Asset', 'Liability'];
-  const schedules = ['Daily', 'Weekly', 'Monthly', 'Yearly'];
-  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const types = ["Expense", "Income", "Asset", "Liability"]
+  const schedules = ["Daily", "Weekly", "Monthly", "Yearly"]
+  const months = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ]
 
   return (
     <div className="bg-[#191b1f] border border-[#2e2f33] border-solid content-stretch flex flex-col gap-[0px] items-start justify-center px-[17px] py-[13px] relative rounded-[10px] w-full">
       <div className="relative shrink-0 w-full">
         <div className="bg-clip-padding border-0 border-[transparent] border-solid content-stretch flex flex-col gap-[32px] items-start relative w-full">
-
           {/* Header Area */}
           <div
             onClick={onClose}
@@ -268,7 +394,7 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
               <div className="content-stretch flex flex-[1_0_0] flex-col gap-[4px] h-[39px] items-start min-h-px min-w-px relative">
                 <div className="content-stretch flex items-center gap-[4px] relative shrink-0">
                   <p className="font-['Inter_Tight',sans-serif] font-medium leading-[18px] not-italic relative shrink-0 text-[14px] text-white whitespace-nowrap">
-                    {formData.flowName || 'New Flow'}
+                    {formData.flowName || "New Flow"}
                   </p>
                   <ChevronDown size={14} color="#99a0ae" />
                 </div>
@@ -279,7 +405,10 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
               <p className="font-['Inter_Tight',sans-serif] font-semibold leading-[18px] not-italic relative shrink-0 text-[14px] text-[#df1c41] whitespace-nowrap">
                 LKR {Number(formData.amount || 0).toLocaleString()}
               </p>
-              <Toggle active={flow.enabled} className="bg-[#065f46] content-stretch flex h-[20px] items-center justify-end p-[2px] relative rounded-[999px] shrink-0 w-[35px]" />
+              <Toggle
+                active={flow.enabled}
+                className="bg-[#065f46] content-stretch flex h-[20px] items-center justify-end p-[2px] relative rounded-[999px] shrink-0 w-[35px]"
+              />
             </div>
           </div>
 
@@ -287,7 +416,6 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
 
           {/* Form Content */}
           <div className="content-stretch flex flex-col gap-[16px] items-start relative shrink-0 w-full">
-
             {/* Flow Name & Amount Row */}
             <div className="content-stretch flex gap-[16px] items-center relative shrink-0 w-full">
               <div className="content-stretch flex flex-[1_0_0] flex-col gap-[8px] items-start justify-center min-h-px min-w-px relative">
@@ -300,7 +428,9 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
                   <input
                     type="text"
                     value={formData.flowName}
-                    onChange={(e) => setFormData({ ...formData, flowName: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({...formData, flowName: e.target.value})
+                    }
                     placeholder="Enter flow name"
                     className="bg-transparent flex-[1_0_0] font-['Inter_Tight',sans-serif] font-normal leading-[18px] min-h-px min-w-px not-italic relative text-[14px] text-[#99a0ae] outline-none"
                   />
@@ -313,11 +443,15 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
                   </p>
                 </div>
                 <div className="bg-[#141414] border-[1px] border-[#2e2f33] border-solid content-stretch flex gap-[12px] items-center overflow-clip px-[12px] py-[8px] relative rounded-[8px] shrink-0 w-full focus-within:border-[#99a0ae] transition-colors">
-                  <span className="text-[#717784] font-['Inter_Tight',sans-serif] text-[14px]">LKR</span>
+                  <span className="text-[#717784] font-['Inter_Tight',sans-serif] text-[14px]">
+                    LKR
+                  </span>
                   <input
                     type="number"
                     value={formData.amount}
-                    onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({...formData, amount: e.target.value})
+                    }
                     placeholder="0"
                     className="bg-transparent flex-[1_0_0] font-['Inter_Tight',sans-serif] font-normal leading-[18px] min-h-px min-w-px not-italic relative text-[#717784] text-[14px] outline-none"
                   />
@@ -334,19 +468,40 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
                   </p>
                 </div>
                 <div className="bg-[#191b1f] border border-[#2e2f33] border-solid content-stretch flex gap-[4px] items-start p-[4px] relative rounded-[12px] shrink-0 w-full">
-                  {types.map(t => (
+                  {types.map((t) => (
                     <div
                       key={t}
                       onClick={() => {
-                        const newCatList = t === 'Expense' ? allExpenseCats : t === 'Income' ? allIncomeCats : t === 'Asset' ? allAssetCats : allLiabilityCats;
-                        setFormData({ ...formData, type: t, category: newCatList.length > 0 ? newCatList[0].label : 'General' });
+                        const newCatList =
+                          t === "Expense"
+                            ? allExpenseCats
+                            : t === "Income"
+                            ? allIncomeCats
+                            : t === "Asset"
+                            ? allAssetCats
+                            : allLiabilityCats
+                        setFormData({
+                          ...formData,
+                          type: t,
+                          category:
+                            newCatList.length > 0
+                              ? newCatList[0].label
+                              : "General",
+                        })
                       }}
-                      className={`content-stretch flex flex-[1_0_0] gap-[8px] items-center justify-center min-h-px min-w-px px-[24px] py-[4px] relative rounded-[8px] cursor-pointer transition-all ${formData.type === t
-                          ? 'bg-[rgba(65,63,63,0.5)] shadow-[0px_1px_6px_0px_rgba(14,18,27,0.08)]'
-                          : 'bg-transparent hover:bg-[#2e2f33]/30'
-                        }`}
+                      className={`content-stretch flex flex-[1_0_0] gap-[8px] items-center justify-center min-h-px min-w-px px-[24px] py-[4px] relative rounded-[8px] cursor-pointer transition-all ${
+                        formData.type === t
+                          ? "bg-[rgba(65,63,63,0.5)] shadow-[0px_1px_6px_0px_rgba(14,18,27,0.08)]"
+                          : "bg-transparent hover:bg-[#2e2f33]/30"
+                      }`}
                     >
-                      <p className={`font-['Inter_Tight',sans-serif] ${formData.type === t ? 'font-medium text-white' : 'font-normal text-[#717784]'} leading-[24px] not-italic relative shrink-0 text-[16px] text-center whitespace-nowrap`}>
+                      <p
+                        className={`font-['Inter_Tight',sans-serif] ${
+                          formData.type === t
+                            ? "font-medium text-white"
+                            : "font-normal text-[#717784]"
+                        } leading-[24px] not-italic relative shrink-0 text-[16px] text-center whitespace-nowrap`}
+                      >
                         {t}
                       </p>
                     </div>
@@ -361,24 +516,36 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
                 </div>
                 <div className="relative w-full" ref={categoryRef}>
                   <div
-                    onClick={() => toggleDropdown('category')}
-                    className={`bg-[#141414] border-[1px] border-[#2e2f33] border-solid content-stretch flex gap-[12px] items-center overflow-clip px-[12px] py-[8px] relative ${isCategoryOpen ? 'rounded-t-[8px] rounded-b-none' : 'rounded-[8px]'} shrink-0 w-full focus-within:border-[#99a0ae] transition-colors cursor-pointer`}
+                    onClick={() => toggleDropdown("category")}
+                    className={`bg-[#141414] border-[1px] border-[#2e2f33] border-solid content-stretch flex gap-[12px] items-center overflow-clip px-[12px] py-[8px] relative ${
+                      isCategoryOpen
+                        ? "rounded-t-[8px] rounded-b-none"
+                        : "rounded-[8px]"
+                    } shrink-0 w-full focus-within:border-[#99a0ae] transition-colors cursor-pointer`}
                   >
                     <span className="flex-[1_0_0] font-['Inter_Tight',sans-serif] font-normal leading-[18px] text-[14px] text-[#717784] truncate">
                       {formData.category}
                     </span>
                     <div className="overflow-clip relative shrink-0 size-[20px] pointer-events-none">
-                      <ChevronDown color="#717784" size={16} className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transition-transform ${isCategoryOpen ? 'rotate-180' : ''}`} />
+                      <ChevronDown
+                        color="#717784"
+                        size={16}
+                        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transition-transform ${
+                          isCategoryOpen ? "rotate-180" : ""
+                        }`}
+                      />
                     </div>
                   </div>
 
                   {isCategoryOpen && (
                     <div className="absolute top-full left-0 right-0 z-50 bg-[#15171a] border border-[#2e2f33] border-solid border-t-0 flex flex-col items-start overflow-clip pb-[24px] pt-[16px] px-[16px] rounded-b-[16px] rounded-t-none shadow-[0px_10px_100px_0px_rgba(10,10,57,0.15)] animate-in fade-in slide-in-from-top-1 duration-200">
-
-                      {categoryViewState === 'list' ? (
+                      {categoryViewState === "list" ? (
                         <>
                           <div className="bg-[#191b1f] border border-[#2e2f33] rounded-[8px] h-[40px] px-[8px] flex items-center gap-[4px] w-full mb-[8px] shadow-[0px_2px_8px_-4px_rgba(10,13,20,0.2)]">
-                            <Search size={16} className="text-[#99a0ae] shrink-0" />
+                            <Search
+                              size={16}
+                              className="text-[#99a0ae] shrink-0"
+                            />
                             <input
                               type="text"
                               value={searchQuery}
@@ -392,43 +559,62 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
                           <div className="w-full flex-col flex max-h-[300px] overflow-y-auto scrollbar-hide">
                             {filteredCategories.length > 0 ? (
                               <>
-                                {Object.entries(groupedCategories).map(([masterCat, cats]) => (
-                                  <div key={masterCat} className="flex flex-col items-start w-full gap-[6px]">
-                                    <div className="py-[6px] w-full">
-                                      <span className="text-[#717784] font-['Inter_Tight',sans-serif] font-medium text-[14px] leading-[18px]">
-                                        {masterCat}
-                                      </span>
-                                    </div>
-                                    <div className="flex flex-col gap-[6px] items-start w-full">
-                                      {cats.map((c, index) => (
-                                        <React.Fragment key={c.id}>
-                                          {index !== 0 && <div className="h-px bg-[#2e2f33] w-full" />}
-                                          <div
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              setFormData({ ...formData, category: c.label });
-                                              setIsCategoryOpen(false);
-                                              setSearchQuery('');
-                                            }}
-                                            className="flex items-center gap-[8px] px-[12px] py-[6px] rounded-[12px] cursor-pointer hover:bg-white/[0.04] transition-colors w-full"
-                                          >
-                                            <div className="w-[24px] h-[24px] flex items-center justify-center shrink-0">
-                                              <CategoryIcon icon={c.icon} size={20} color="#99a0ae" />
+                                {Object.entries(groupedCategories).map(
+                                  ([masterCat, cats]) => (
+                                    <div
+                                      key={masterCat}
+                                      className="flex flex-col items-start w-full gap-[6px]"
+                                    >
+                                      <div className="py-[6px] w-full">
+                                        <span className="text-[#717784] font-['Inter_Tight',sans-serif] font-medium text-[14px] leading-[18px]">
+                                          {masterCat}
+                                        </span>
+                                      </div>
+                                      <div className="flex flex-col gap-[6px] items-start w-full">
+                                        {cats.map((c, index) => (
+                                          <React.Fragment key={c.id}>
+                                            {index !== 0 && (
+                                              <div className="h-px bg-[#2e2f33] w-full" />
+                                            )}
+                                            <div
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                setFormData({
+                                                  ...formData,
+                                                  category: c.label,
+                                                })
+                                                setIsCategoryOpen(false)
+                                                setSearchQuery("")
+                                              }}
+                                              className="flex items-center gap-[8px] px-[12px] py-[6px] rounded-[12px] cursor-pointer hover:bg-white/[0.04] transition-colors w-full"
+                                            >
+                                              <div className="w-[24px] h-[24px] flex items-center justify-center shrink-0">
+                                                <CategoryIcon
+                                                  icon={c.icon}
+                                                  size={20}
+                                                  color="#99a0ae"
+                                                />
+                                              </div>
+                                              <span className="text-[14px] text-[#99a0ae] font-['Inter_Tight',sans-serif] font-normal leading-[18px]">
+                                                {c.label}
+                                              </span>
                                             </div>
-                                            <span className="text-[14px] text-[#99a0ae] font-['Inter_Tight',sans-serif] font-normal leading-[18px]">
-                                              {c.label}
-                                            </span>
-                                          </div>
-                                        </React.Fragment>
-                                      ))}
+                                          </React.Fragment>
+                                        ))}
+                                      </div>
                                     </div>
-                                  </div>
-                                ))}
-                                {searchQuery === '' && (
+                                  )
+                                )}
+                                {searchQuery === "" && (
                                   <div className="flex justify-start px-[8px] py-[4px] mt-[8px]">
                                     <button className="flex items-center justify-center gap-[4px] cursor-pointer hover:opacity-80 transition-opacity">
-                                      <span className="font-['Inter_Tight',sans-serif] font-medium text-[16px] leading-[24px] text-white whitespace-nowrap">Create New Category</span>
-                                      <ChevronRight size={20} className="text-white" />
+                                      <span className="font-['Inter_Tight',sans-serif] font-medium text-[16px] leading-[24px] text-white whitespace-nowrap">
+                                        Create New Category
+                                      </span>
+                                      <ChevronRight
+                                        size={20}
+                                        className="text-white"
+                                      />
                                     </button>
                                   </div>
                                 )}
@@ -436,9 +622,9 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
                             ) : (
                               <button
                                 onClick={(e) => {
-                                  e.stopPropagation();
-                                  setNewCategoryLabel(searchQuery);
-                                  setCategoryViewState('assign-master');
+                                  e.stopPropagation()
+                                  setNewCategoryLabel(searchQuery)
+                                  setCategoryViewState("assign-master")
                                 }}
                                 className="w-full flex items-center gap-[8px] p-[12px] bg-[#191b1f] border border-dashed border-[#40c4aa] rounded-[12px] hover:bg-[#40c4aa]/10 transition-colors mt-[8px] cursor-pointer"
                               >
@@ -460,8 +646,8 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
                               <button
                                 key={masterOpt}
                                 onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleCreateCategory(masterOpt);
+                                  e.stopPropagation()
+                                  handleCreateCategory(masterOpt)
                                 }}
                                 className="flex items-center justify-start p-[12px] rounded-[12px] border border-[#2e2f33] bg-[#191b1f] hover:bg-[#2e2f33]/40 transition-all font-['Inter_Tight',sans-serif] text-[14px] text-[#99a0ae] cursor-pointer"
                               >
@@ -471,8 +657,8 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
                           </div>
                           <button
                             onClick={(e) => {
-                              e.stopPropagation();
-                              setCategoryViewState('list');
+                              e.stopPropagation()
+                              setCategoryViewState("list")
                             }}
                             className="text-[#717784] text-[12px] hover:text-white transition-colors"
                           >
@@ -496,14 +682,24 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
                 </div>
                 <div className="relative w-full" ref={scheduleRef}>
                   <div
-                    onClick={() => toggleDropdown('schedule')}
-                    className={`bg-[#141414] border-[1px] border-[#2e2f33] border-solid content-stretch flex gap-[12px] items-center overflow-clip px-[12px] py-[8px] relative ${isScheduleOpen ? 'rounded-t-[8px] rounded-b-none' : 'rounded-[8px]'} shrink-0 w-full focus-within:border-[#99a0ae] transition-colors cursor-pointer`}
+                    onClick={() => toggleDropdown("schedule")}
+                    className={`bg-[#141414] border-[1px] border-[#2e2f33] border-solid content-stretch flex gap-[12px] items-center overflow-clip px-[12px] py-[8px] relative ${
+                      isScheduleOpen
+                        ? "rounded-t-[8px] rounded-b-none"
+                        : "rounded-[8px]"
+                    } shrink-0 w-full focus-within:border-[#99a0ae] transition-colors cursor-pointer`}
                   >
                     <span className="flex-[1_0_0] font-['Inter_Tight',sans-serif] font-normal leading-[18px] text-[14px] text-[#717784]">
                       {formData.schedule}
                     </span>
                     <div className="overflow-clip relative shrink-0 size-[20px] pointer-events-none">
-                      <ChevronDown color="#717784" size={16} className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transition-transform ${isScheduleOpen ? 'rotate-180' : ''}`} />
+                      <ChevronDown
+                        color="#717784"
+                        size={16}
+                        className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transition-transform ${
+                          isScheduleOpen ? "rotate-180" : ""
+                        }`}
+                      />
                     </div>
                   </div>
 
@@ -512,11 +708,13 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
                       <div className="flex flex-col gap-[6px] items-start w-full">
                         {schedules.map((s, index) => (
                           <React.Fragment key={s}>
-                            {index !== 0 && <div className="h-px bg-[#2e2f33] w-full" />}
+                            {index !== 0 && (
+                              <div className="h-px bg-[#2e2f33] w-full" />
+                            )}
                             <div
                               onClick={() => {
-                                setFormData({ ...formData, schedule: s });
-                                setIsScheduleOpen(false);
+                                setFormData({...formData, schedule: s})
+                                setIsScheduleOpen(false)
                               }}
                               className="flex flex-col items-start p-[8px] rounded-[8px] w-full cursor-pointer hover:bg-[#1a1b1f] transition-colors"
                             >
@@ -541,7 +739,9 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
                   <input
                     type="text"
                     value={formData.note}
-                    onChange={(e) => setFormData({ ...formData, note: e.target.value })}
+                    onChange={(e) =>
+                      setFormData({...formData, note: e.target.value})
+                    }
                     placeholder="Add a note"
                     className="bg-transparent flex-[1_0_0] font-['Inter_Tight',sans-serif] font-normal leading-[18px] min-h-px min-w-px not-italic relative text-[#717784] text-[14px] outline-none"
                   />
@@ -550,7 +750,7 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
             </div>
 
             {/* Conditional 'On day' Field for Monthly Schedule */}
-            {formData.schedule === 'Monthly' && (
+            {formData.schedule === "Monthly" && (
               <div className="content-stretch flex gap-[16px] items-center relative shrink-0 w-full animate-in fade-in slide-in-from-top-2 duration-200">
                 <div className="content-stretch flex flex-[1_0_0] flex-col gap-[8px] items-start justify-center relative shrink-0 min-h-px min-w-px">
                   <div className="content-stretch flex gap-[2px] items-center relative shrink-0">
@@ -560,14 +760,24 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
                   </div>
                   <div className="relative w-full" ref={dayRef}>
                     <div
-                      onClick={() => toggleDropdown('day')}
-                      className={`bg-[#141414] border-[1px] border-[#2e2f33] border-solid content-stretch flex gap-[12px] items-center overflow-clip px-[12px] py-[8px] relative ${isDayOpen ? 'rounded-t-[8px] rounded-b-none' : 'rounded-[8px]'} shrink-0 w-full focus-within:border-[#99a0ae] transition-colors cursor-pointer`}
+                      onClick={() => toggleDropdown("day")}
+                      className={`bg-[#141414] border-[1px] border-[#2e2f33] border-solid content-stretch flex gap-[12px] items-center overflow-clip px-[12px] py-[8px] relative ${
+                        isDayOpen
+                          ? "rounded-t-[8px] rounded-b-none"
+                          : "rounded-[8px]"
+                      } shrink-0 w-full focus-within:border-[#99a0ae] transition-colors cursor-pointer`}
                     >
                       <span className="flex-[1_0_0] font-['Inter_Tight',sans-serif] font-normal leading-[18px] text-[14px] text-[#717784]">
                         {formData.onDay}
                       </span>
                       <div className="overflow-clip relative shrink-0 size-[20px] pointer-events-none">
-                        <ChevronDown color="#717784" size={16} className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transition-transform ${isDayOpen ? 'rotate-180' : ''}`} />
+                        <ChevronDown
+                          color="#717784"
+                          size={16}
+                          className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transition-transform ${
+                            isDayOpen ? "rotate-180" : ""
+                          }`}
+                        />
                       </div>
                     </div>
 
@@ -575,8 +785,11 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
                       <div className="absolute top-full left-0 right-0 z-50 bg-[#15161a] border border-[#2e2f33] border-solid border-t-0 flex flex-col gap-[16px] items-start overflow-clip p-[16px] rounded-b-[16px] shadow-[0px_10px_100px_0px_rgba(10,10,57,0.15)] animate-in fade-in slide-in-from-top-1 duration-200">
                         <div
                           onClick={() => {
-                            setFormData({ ...formData, onDay: 'Last day of the month' });
-                            setIsDayOpen(false);
+                            setFormData({
+                              ...formData,
+                              onDay: "Last day of the month",
+                            })
+                            setIsDayOpen(false)
                           }}
                           className="bg-[#191b1f] border border-[#2e2f33] border-solid content-stretch flex flex-col items-center justify-center p-[8px] relative rounded-[12px] w-full cursor-pointer hover:bg-[#2e2f33]/30 transition-colors"
                         >
@@ -586,21 +799,33 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
                         </div>
 
                         <div className="grid grid-cols-7 gap-[8px] w-full">
-                          {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
-                            <div
-                              key={day}
-                              onClick={() => {
-                                const suffix = day === 1 ? 'st' : day === 2 ? 'nd' : day === 3 ? 'rd' : 'th';
-                                setFormData({ ...formData, onDay: `${day}${suffix} day of the month` });
-                                setIsDayOpen(false);
-                              }}
-                              className="bg-[#191b1f] border border-[#2e2f33] border-solid flex items-center justify-center py-[12px] relative rounded-[12px] cursor-pointer hover:bg-[#2e2f33]/30 transition-colors"
-                            >
-                              <span className="font-['Inter_Tight',sans-serif] font-normal leading-[18px] text-[14px] text-[#99a0ae]">
-                                {day}
-                              </span>
-                            </div>
-                          ))}
+                          {Array.from({length: 31}, (_, i) => i + 1).map(
+                            (day) => (
+                              <div
+                                key={day}
+                                onClick={() => {
+                                  const suffix =
+                                    day === 1
+                                      ? "st"
+                                      : day === 2
+                                      ? "nd"
+                                      : day === 3
+                                      ? "rd"
+                                      : "th"
+                                  setFormData({
+                                    ...formData,
+                                    onDay: `${day}${suffix} day of the month`,
+                                  })
+                                  setIsDayOpen(false)
+                                }}
+                                className="bg-[#191b1f] border border-[#2e2f33] border-solid flex items-center justify-center py-[12px] relative rounded-[12px] cursor-pointer hover:bg-[#2e2f33]/30 transition-colors"
+                              >
+                                <span className="font-['Inter_Tight',sans-serif] font-normal leading-[18px] text-[14px] text-[#99a0ae]">
+                                  {day}
+                                </span>
+                              </div>
+                            )
+                          )}
                         </div>
                       </div>
                     )}
@@ -612,7 +837,7 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
             )}
 
             {/* Conditional 'Select Days' Field for Weekly Schedule */}
-            {formData.schedule === 'Weekly' && (
+            {formData.schedule === "Weekly" && (
               <div className="content-stretch flex gap-[16px] items-center relative shrink-0 w-full animate-in fade-in slide-in-from-top-2 duration-200">
                 <div className="content-stretch flex flex-[1_0_0] flex-col gap-[8px] items-start justify-center relative shrink-0 min-h-px min-w-px">
                   <div className="content-stretch flex gap-[2px] items-center relative shrink-0">
@@ -622,34 +847,43 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
                   </div>
                   <div className="flex gap-[8px] items-center relative shrink-0">
                     {[
-                      { label: 'S', value: 'Sun' },
-                      { label: 'M', value: 'Mon' },
-                      { label: 'T', value: 'Tue' },
-                      { label: 'W', value: 'Wed' },
-                      { label: 'T', value: 'Thu' },
-                      { label: 'F', value: 'Fri' },
-                      { label: 'S', value: 'Sat' }
+                      {label: "S", value: "Sun"},
+                      {label: "M", value: "Mon"},
+                      {label: "T", value: "Tue"},
+                      {label: "W", value: "Wed"},
+                      {label: "T", value: "Thu"},
+                      {label: "F", value: "Fri"},
+                      {label: "S", value: "Sat"},
                     ].map((dayObj, index) => {
-                      const isSelected = formData.selectedDays.includes(dayObj.value);
+                      const isSelected = formData.selectedDays.includes(
+                        dayObj.value
+                      )
                       return (
                         <div
                           key={`${dayObj.value}-${index}`}
                           onClick={() => {
                             const newDays = isSelected
-                              ? formData.selectedDays.filter(v => v !== dayObj.value)
-                              : [...formData.selectedDays, dayObj.value];
-                            setFormData({ ...formData, selectedDays: newDays });
+                              ? formData.selectedDays.filter(
+                                  (v) => v !== dayObj.value
+                                )
+                              : [...formData.selectedDays, dayObj.value]
+                            setFormData({...formData, selectedDays: newDays})
                           }}
-                          className={`content-stretch flex flex-col items-center justify-center px-[12px] py-[8px] relative rounded-[12px] shrink-0 min-w-[34px] cursor-pointer transition-all border border-solid ${isSelected
-                              ? 'bg-[#065f46] border-[rgba(255,255,255,0.2)]'
-                              : 'bg-[rgba(65,63,63,0.2)] border-[#2e2f33] hover:bg-[#2e2f33]/40'
-                            }`}
+                          className={`content-stretch flex flex-col items-center justify-center px-[12px] py-[8px] relative rounded-[12px] shrink-0 min-w-[34px] cursor-pointer transition-all border border-solid ${
+                            isSelected
+                              ? "bg-[#065f46] border-[rgba(255,255,255,0.2)]"
+                              : "bg-[rgba(65,63,63,0.2)] border-[#2e2f33] hover:bg-[#2e2f33]/40"
+                          }`}
                         >
-                          <span className={`font-['Inter_Tight',sans-serif] font-normal leading-[18px] text-[14px] ${isSelected ? 'text-white' : 'text-[#717784]'}`}>
+                          <span
+                            className={`font-['Inter_Tight',sans-serif] font-normal leading-[18px] text-[14px] ${
+                              isSelected ? "text-white" : "text-[#717784]"
+                            }`}
+                          >
                             {dayObj.label}
                           </span>
                         </div>
-                      );
+                      )
                     })}
                   </div>
                 </div>
@@ -658,7 +892,7 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
             )}
 
             {/* Conditional 'Month' and 'Date' Fields for Yearly Schedule */}
-            {formData.schedule === 'Yearly' && (
+            {formData.schedule === "Yearly" && (
               <div className="content-stretch flex gap-[16px] items-center relative shrink-0 w-full animate-in fade-in slide-in-from-top-2 duration-200">
                 {/* Month Picker */}
                 <div className="content-stretch flex flex-[1_0_0] flex-col gap-[8px] items-start justify-center relative shrink-0 min-h-px min-w-px">
@@ -669,14 +903,24 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
                   </div>
                   <div className="relative w-full" ref={monthRef}>
                     <div
-                      onClick={() => toggleDropdown('month')}
-                      className={`bg-[#141414] border-[1px] border-[#2e2f33] border-solid content-stretch flex gap-[12px] items-center overflow-clip px-[12px] py-[8px] relative ${isMonthOpen ? 'rounded-t-[8px] rounded-b-none' : 'rounded-[8px]'} shrink-0 w-full focus-within:border-[#99a0ae] transition-colors cursor-pointer`}
+                      onClick={() => toggleDropdown("month")}
+                      className={`bg-[#141414] border-[1px] border-[#2e2f33] border-solid content-stretch flex gap-[12px] items-center overflow-clip px-[12px] py-[8px] relative ${
+                        isMonthOpen
+                          ? "rounded-t-[8px] rounded-b-none"
+                          : "rounded-[8px]"
+                      } shrink-0 w-full focus-within:border-[#99a0ae] transition-colors cursor-pointer`}
                     >
                       <span className="flex-[1_0_0] font-['Inter_Tight',sans-serif] font-normal leading-[18px] text-[14px] text-[#717784]">
                         {formData.onMonth}
                       </span>
                       <div className="overflow-clip relative shrink-0 size-[20px] pointer-events-none">
-                        <ChevronDown color="#717784" size={16} className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transition-transform ${isMonthOpen ? 'rotate-180' : ''}`} />
+                        <ChevronDown
+                          color="#717784"
+                          size={16}
+                          className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transition-transform ${
+                            isMonthOpen ? "rotate-180" : ""
+                          }`}
+                        />
                       </div>
                     </div>
 
@@ -685,15 +929,23 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
                         <div className="flex flex-col gap-[6px] items-start w-full">
                           {months.map((m, index) => (
                             <React.Fragment key={m}>
-                              {index !== 0 && <div className="h-px bg-[#2e2f33] w-full" />}
+                              {index !== 0 && (
+                                <div className="h-px bg-[#2e2f33] w-full" />
+                              )}
                               <div
                                 onClick={() => {
-                                  setFormData({ ...formData, onMonth: m });
-                                  setIsMonthOpen(false);
+                                  setFormData({...formData, onMonth: m})
+                                  setIsMonthOpen(false)
                                 }}
                                 className="flex flex-col items-start p-[8px] rounded-[8px] w-full cursor-pointer hover:bg-[#1a1b1f] transition-colors"
                               >
-                                <span className={`font-['Inter_Tight',sans-serif] font-medium leading-[18px] text-[14px] ${formData.onMonth === m ? 'text-white' : 'text-[#717784]'}`}>
+                                <span
+                                  className={`font-['Inter_Tight',sans-serif] font-medium leading-[18px] text-[14px] ${
+                                    formData.onMonth === m
+                                      ? "text-white"
+                                      : "text-[#717784]"
+                                  }`}
+                                >
                                   {m}
                                 </span>
                               </div>
@@ -714,14 +966,24 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
                   </div>
                   <div className="relative w-full">
                     <div
-                      onClick={() => toggleDropdown('day')}
-                      className={`bg-[#141414] border-[1px] border-[#2e2f33] border-solid content-stretch flex gap-[12px] items-center overflow-clip px-[12px] py-[8px] relative ${isDayOpen ? 'rounded-t-[8px] rounded-b-none' : 'rounded-[8px]'} shrink-0 w-full focus-within:border-[#99a0ae] transition-colors cursor-pointer`}
+                      onClick={() => toggleDropdown("day")}
+                      className={`bg-[#141414] border-[1px] border-[#2e2f33] border-solid content-stretch flex gap-[12px] items-center overflow-clip px-[12px] py-[8px] relative ${
+                        isDayOpen
+                          ? "rounded-t-[8px] rounded-b-none"
+                          : "rounded-[8px]"
+                      } shrink-0 w-full focus-within:border-[#99a0ae] transition-colors cursor-pointer`}
                     >
                       <span className="flex-[1_0_0] font-['Inter_Tight',sans-serif] font-normal leading-[18px] text-[14px] text-[#717784]">
                         {formData.onDay}
                       </span>
                       <div className="overflow-clip relative shrink-0 size-[20px] pointer-events-none">
-                        <ChevronDown color="#717784" size={16} className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transition-transform ${isDayOpen ? 'rotate-180' : ''}`} />
+                        <ChevronDown
+                          color="#717784"
+                          size={16}
+                          className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transition-transform ${
+                            isDayOpen ? "rotate-180" : ""
+                          }`}
+                        />
                       </div>
                     </div>
 
@@ -729,8 +991,11 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
                       <div className="absolute top-full left-0 right-0 z-50 bg-[#15161a] border border-[#2e2f33] border-solid border-t-0 flex flex-col gap-[16px] items-start overflow-clip p-[16px] rounded-b-[16px] shadow-[0px_10px_100px_0px_rgba(10,10,57,0.15)]">
                         <div
                           onClick={() => {
-                            setFormData({ ...formData, onDay: 'Last day of the month' });
-                            setIsDayOpen(false);
+                            setFormData({
+                              ...formData,
+                              onDay: "Last day of the month",
+                            })
+                            setIsDayOpen(false)
                           }}
                           className="bg-[#191b1f] border border-[#2e2f33] border-solid content-stretch flex flex-col items-center justify-center p-[8px] relative rounded-[12px] w-full cursor-pointer hover:bg-[#2e2f33]/30 transition-colors"
                         >
@@ -740,21 +1005,33 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
                         </div>
 
                         <div className="grid grid-cols-7 gap-[8px] w-full">
-                          {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
-                            <div
-                              key={day}
-                              onClick={() => {
-                                const suffix = day === 1 ? 'st' : day === 2 ? 'nd' : day === 3 ? 'rd' : 'th';
-                                setFormData({ ...formData, onDay: `${day}${suffix} day of the month` });
-                                setIsDayOpen(false);
-                              }}
-                              className="bg-[#191b1f] border border-[#2e2f33] border-solid flex items-center justify-center py-[12px] relative rounded-[12px] cursor-pointer hover:bg-[#2e2f33]/30 transition-colors"
-                            >
-                              <span className="font-['Inter_Tight',sans-serif] font-normal leading-[18px] text-[14px] text-[#99a0ae]">
-                                {day}
-                              </span>
-                            </div>
-                          ))}
+                          {Array.from({length: 31}, (_, i) => i + 1).map(
+                            (day) => (
+                              <div
+                                key={day}
+                                onClick={() => {
+                                  const suffix =
+                                    day === 1
+                                      ? "st"
+                                      : day === 2
+                                      ? "nd"
+                                      : day === 3
+                                      ? "rd"
+                                      : "th"
+                                  setFormData({
+                                    ...formData,
+                                    onDay: `${day}${suffix} day of the month`,
+                                  })
+                                  setIsDayOpen(false)
+                                }}
+                                className="bg-[#191b1f] border border-[#2e2f33] border-solid flex items-center justify-center py-[12px] relative rounded-[12px] cursor-pointer hover:bg-[#2e2f33]/30 transition-colors"
+                              >
+                                <span className="font-['Inter_Tight',sans-serif] font-normal leading-[18px] text-[14px] text-[#99a0ae]">
+                                  {day}
+                                </span>
+                              </div>
+                            )
+                          )}
                         </div>
                       </div>
                     )}
@@ -787,10 +1064,9 @@ export function EditAutopilotForm({ flow, onClose, onRefresh }: { flow: Autopilo
                 </div>
               </button>
             </div>
-
           </div>
         </div>
       </div>
     </div>
-  );
+  )
 }

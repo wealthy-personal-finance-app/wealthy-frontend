@@ -10,6 +10,9 @@ import {
   MoreHorizontal,
 } from "lucide-react"
 import svgPaths from "../../../imports/TransactionsHistory/svg-pq2oaob5wk"
+import {getAuthToken} from "../../utils/auth"
+import {apiFetchJson, apiUrl} from "../../apis/client"
+import {ENDPOINTS} from "../../apis/endpoints"
 
 type ChatMessage = {
   id: string
@@ -17,33 +20,15 @@ type ChatMessage = {
   text: string
 }
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000"
-const AI_CHAT_ENDPOINT = `${API_BASE_URL}/api/ai/chat`
-const AI_HISTORY_ENDPOINT = `${API_BASE_URL}/api/ai/history`
-const AI_SUGGESTIONS_ENDPOINT = `${API_BASE_URL}/api/ai/suggestions`
+const AI_CHAT_ENDPOINT = apiUrl(ENDPOINTS.ai.chat)
+const AI_HISTORY_ENDPOINT = apiUrl(ENDPOINTS.ai.history)
+const AI_SUGGESTIONS_ENDPOINT = apiUrl(ENDPOINTS.ai.suggestions)
 
 const FALLBACK_SUGGESTIONS = [
   "Compare food expenses to last month",
   "Am I on track for my savings goal?",
   "Show my biggest liability",
 ]
-
-const POSSIBLE_TOKEN_KEYS = [
-  "token",
-  "accessToken",
-  "authToken",
-  "jwt",
-  "wealthyToken",
-]
-
-function getAuthToken(): string | null {
-  for (const key of POSSIBLE_TOKEN_KEYS) {
-    const token = localStorage.getItem(key)
-    if (token) return token
-  }
-  return null
-}
 
 function extractAssistantMessage(payload: unknown): string {
   if (!payload || typeof payload !== "object") {
@@ -263,19 +248,13 @@ export function AIAssistantPage({
     setIsLoadingSuggestions(true)
 
     try {
-      const response = await fetch(AI_SUGGESTIONS_ENDPOINT, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      let payload: unknown = null
-      try {
-        payload = await response.json()
-      } catch {
-        payload = null
-      }
+      const {response, data: payload} = await apiFetchJson<unknown>(
+        AI_SUGGESTIONS_ENDPOINT,
+        {
+          method: "GET",
+          auth: true,
+        }
+      )
 
       if (!response.ok) {
         throw new Error(`Failed to load suggestions (${response.status})`)
@@ -327,22 +306,13 @@ export function AIAssistantPage({
       setErrorMessage(null)
 
       try {
-        const response = await fetch(
+        const {response, data: payload} = await apiFetchJson<unknown>(
           `${AI_HISTORY_ENDPOINT}/${activeConversationId}`,
           {
             method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
+            auth: true,
           }
         )
-
-        let payload: unknown = null
-        try {
-          payload = await response.json()
-        } catch {
-          payload = null
-        }
 
         if (!response.ok) {
           const backendMessage =
@@ -395,26 +365,22 @@ export function AIAssistantPage({
         throw new Error("No auth token found. Please sign in first.")
       }
 
-      const response = await fetch(AI_CHAT_ENDPOINT, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          message: trimmed,
-          ...(activeConversationId
-            ? {conversationId: activeConversationId}
-            : {}),
-        }),
-      })
-
-      let payload: unknown = null
-      try {
-        payload = await response.json()
-      } catch {
-        payload = null
-      }
+      const {response, data: payload} = await apiFetchJson<unknown>(
+        AI_CHAT_ENDPOINT,
+        {
+          method: "POST",
+          auth: true,
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            message: trimmed,
+            ...(activeConversationId
+              ? {conversationId: activeConversationId}
+              : {}),
+          }),
+        }
+      )
 
       if (!response.ok) {
         const backendMessage =

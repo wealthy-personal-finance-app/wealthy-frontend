@@ -23,3 +23,7 @@ To run this project locally on your machine:
 1. **Install dependencies:**
    ```bash
    npm install
+
+2. **Run App:**
+   ```bash
+   npm run dev
