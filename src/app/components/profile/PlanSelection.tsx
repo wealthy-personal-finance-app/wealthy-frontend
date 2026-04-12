@@ -3,31 +3,16 @@ import {useNavigate} from "react-router-dom"
 import {AuthCenteredLayout} from "../auth/AuthCenteredLayout"
 import {Button} from "../ui/button"
 import {toast} from "sonner"
+import {getAuthToken} from "../../utils/auth"
+import {apiFetchJson} from "../../apis/client"
+import {ENDPOINTS} from "../../apis/endpoints"
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000"
 const PAYMENT_ENDPOINT_CANDIDATES = [
-  `${API_BASE_URL}/api/payments/subscription`,
-  `${API_BASE_URL}/api/payments/subscribe`,
-  `${API_BASE_URL}/api/payments/checkout`,
-  `${API_BASE_URL}/api/payments/checkout-session`,
+  ENDPOINTS.payments.subscription,
+  ENDPOINTS.payments.subscribe,
+  ENDPOINTS.payments.checkout,
+  ENDPOINTS.payments.checkoutSession,
 ]
-const POSSIBLE_TOKEN_KEYS = [
-  "token",
-  "accessToken",
-  "authToken",
-  "jwt",
-  "wealthyToken",
-  "wealthy_token",
-]
-
-function getAuthToken(): string | null {
-  for (const key of POSSIBLE_TOKEN_KEYS) {
-    const token = localStorage.getItem(key)
-    if (token) return token
-  }
-  return null
-}
 
 function extractCheckoutUrl(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null
@@ -89,11 +74,19 @@ export function PlanSelection() {
         return
       }
 
-      const billingCycle = isAnnual ? "annual" : "monthly"
+      const billingCycle = isAnnual ? "annually" : "monthly"
+      const interval = billingCycle
+      const period = isAnnual ? "yearly" : "monthly"
       const payload = {
         plan: "Professional",
         tier: "Professional",
         billingCycle,
+        billing: billingCycle,
+        cycle: billingCycle,
+        interval,
+        period,
+        frequency: period,
+        isAnnual,
       }
 
       setIsPurchasing(true)
@@ -101,21 +94,17 @@ export function PlanSelection() {
         let lastErrorMessage = "Unable to start checkout. Please try again."
 
         for (const endpoint of PAYMENT_ENDPOINT_CANDIDATES) {
-          const response = await fetch(endpoint, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(payload),
-          })
-
-          let responsePayload: unknown = null
-          try {
-            responsePayload = await response.json()
-          } catch {
-            responsePayload = null
-          }
+          const {response, data: responsePayload} = await apiFetchJson<unknown>(
+            endpoint,
+            {
+              method: "POST",
+              auth: true,
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(payload),
+            }
+          )
 
           if (!response.ok) {
             lastErrorMessage = extractErrorMessage(

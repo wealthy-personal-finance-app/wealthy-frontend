@@ -5,6 +5,8 @@ import {AuthInput} from "./AuthInput"
 import {SocialAuthButton} from "./SocialAuthButton"
 import {Button} from "../ui/button"
 import {toast} from "sonner"
+import {apiFetchJson, apiUrl} from "../../apis/client"
+import {ENDPOINTS} from "../../apis/endpoints"
 
 interface SignInFormData {
   email: string
@@ -12,11 +14,9 @@ interface SignInFormData {
   rememberMe: boolean
 }
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:5000"
-const LOGIN_ENDPOINT = `${API_BASE_URL}/api/auth/login`
+const LOGIN_ENDPOINT = apiUrl(ENDPOINTS.auth.login)
 const GOOGLE_AUTH_ENDPOINT =
-  import.meta.env.VITE_GOOGLE_AUTH_URL ?? `${API_BASE_URL}/api/auth/google`
+  import.meta.env.VITE_GOOGLE_AUTH_URL ?? apiUrl(ENDPOINTS.auth.google)
 
 function extractToken(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null
@@ -97,20 +97,16 @@ export function SignIn() {
         password: data.password,
         rememberMe: data.rememberMe,
       }
-      const response = await fetch(LOGIN_ENDPOINT, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      })
-
-      let responsePayload: unknown = null
-      try {
-        responsePayload = await response.json()
-      } catch {
-        responsePayload = null
-      }
+      const {response, data: responsePayload} = await apiFetchJson<unknown>(
+        LOGIN_ENDPOINT,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        }
+      )
 
       if (!response.ok) {
         throw new Error(

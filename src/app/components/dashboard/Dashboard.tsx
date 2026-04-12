@@ -2,6 +2,7 @@
 import React, {useState, useEffect, useCallback} from "react"
 import {
   ChevronDown,
+  ChevronLeft,
   ArrowUpRight,
   ArrowDownRight,
   MoreVertical,
@@ -25,42 +26,28 @@ import {
   Area,
 } from "recharts"
 import {CategoryIcon} from "../transactions/CategoryIcon"
-
-// ============================================================
-// CONFIG — change base URL to match your gateway
-// ============================================================
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000"
-
-// ============================================================
-// API HELPER — reads JWT from localStorage
-// ============================================================
+import {getAuthToken} from "../../utils/auth"
+import {apiFetchJson} from "../../apis/client"
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
-  const token =
-    localStorage.getItem("token") ||
-    localStorage.getItem("jwt") ||
-    localStorage.getItem("accessToken") ||
-    localStorage.getItem("wealthy_token")
-
-  const res = await fetch(`${API_BASE}${path}`, {
+  const token = getAuthToken()
+  const {response: res, data} = await apiFetchJson<T>(path, {
+    auth: Boolean(token),
     headers: {
       "Content-Type": "application/json",
-      ...(token ? {Authorization: `Bearer ${token}`} : {}),
+      ...(options?.headers || {}),
     },
     ...options,
   })
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
+    const err: any = data || {}
     throw new Error(err.message || `HTTP ${res.status}`)
   }
 
-  return res.json()
+  return data as T
 }
 
-// ============================================================
-// TYPES
-// ============================================================
 interface SummaryData {
   totalBalance: number
   income: number
@@ -81,6 +68,78 @@ interface SpendingItem {
   count: number
 }
 
+type SpendingDrilldownMap = Record<string, SpendingItem[]>
+
+interface RawTransactionItem {
+  amount?: number
+  type?: string
+  subCategory?: string
+  parentCategory?: string
+  date?: string
+}
+
+function toDayKey(value: unknown): string | null {
+  if (typeof value !== "string" || !value.trim()) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  const y = date.getUTCFullYear()
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0")
+  const d = String(date.getUTCDate()).padStart(2, "0")
+  return `${y}-${m}-${d}`
+}
+
+function getSignedBalanceDelta(tx: RawTransactionItem): number {
+  const amount = Number(tx.amount)
+  if (!Number.isFinite(amount) || amount === 0) return 0
+
+  const type = String(tx.type || "").toLowerCase()
+  const abs = Math.abs(amount)
+
+  if (type === "income" || type === "asset") return abs
+  if (type === "expense" || type === "liability") return -abs
+  return 0
+}
+
+function buildBalanceOverTime(
+  transactions: RawTransactionItem[],
+  currentTotalBalance?: number
+): ChartPoint[] {
+  const deltaByDay = new Map<string, number>()
+
+  for (const tx of transactions) {
+    const dayKey = toDayKey(tx.date)
+    if (!dayKey) continue
+
+    const delta = getSignedBalanceDelta(tx)
+    if (!delta) continue
+
+    const prev = deltaByDay.get(dayKey) || 0
+    deltaByDay.set(dayKey, prev + delta)
+  }
+
+  const sortedDays = Array.from(deltaByDay.keys()).sort(
+    (a, b) => new Date(a).getTime() - new Date(b).getTime()
+  )
+
+  let running = 0
+  const points: ChartPoint[] = sortedDays.map((day) => {
+    running += deltaByDay.get(day) || 0
+    return {_id: day, total: running}
+  })
+
+  if (points.length === 0) return []
+
+  if (Number.isFinite(currentTotalBalance)) {
+    const offset = Number(currentTotalBalance) - points[points.length - 1].total
+    return points.map((point) => ({
+      ...point,
+      total: point.total + offset,
+    }))
+  }
+
+  return points
+}
+
 interface AutopilotFlow {
   _id: string
   flowName: string
@@ -88,7 +147,7 @@ interface AutopilotFlow {
   type: "income" | "expense" | "asset" | "liability"
   parentCategory: string
   subCategory: string
-  frequency: "daily" | "weekly" | "monthly"
+  frequency: "daily" | "weekly" | "monthly" | "yearly"
   scheduledDay: number
   nextOccurrence: string // ISO date
   isActive: boolean
@@ -106,15 +165,102 @@ interface DashboardState {
   incomeChart: ChartPoint[]
   balanceChart: ChartPoint[]
   spending: SpendingItem[]
+  spendingDrilldown: SpendingDrilldownMap
   autopilot: AutopilotTask[]
   loading: boolean
   error: string | null
 }
 
-// ============================================================
-// CHART PERIOD NAV HELPER
-// ============================================================
+function aggregateExpenseHierarchy(transactions: RawTransactionItem[]): {
+  parents: SpendingItem[]
+  drilldown: SpendingDrilldownMap
+} {
+  const parentMap = new Map<string, {total: number; count: number}>()
+  const subMapByParent = new Map<
+    string,
+    Map<string, {total: number; count: number}>
+  >()
+
+  for (const tx of transactions) {
+    const type = String(tx.type || "").toLowerCase()
+    if (type !== "expense" && type !== "liability") continue
+
+    const amount = Number(tx.amount)
+    if (!Number.isFinite(amount) || amount === 0) continue
+
+    const parent =
+      (typeof tx.parentCategory === "string" && tx.parentCategory.trim()) ||
+      "Other"
+    const sub =
+      (typeof tx.subCategory === "string" && tx.subCategory.trim()) ||
+      parent ||
+      "Other"
+
+    const parentPrev = parentMap.get(parent) || {total: 0, count: 0}
+    parentMap.set(parent, {
+      total: parentPrev.total + Math.abs(amount),
+      count: parentPrev.count + 1,
+    })
+
+    if (!subMapByParent.has(parent)) {
+      subMapByParent.set(parent, new Map())
+    }
+
+    const subMap = subMapByParent.get(parent)!
+    const subPrev = subMap.get(sub) || {total: 0, count: 0}
+    subMap.set(sub, {
+      total: subPrev.total + Math.abs(amount),
+      count: subPrev.count + 1,
+    })
+  }
+
+  const parents = Array.from(parentMap.entries())
+    .map(([name, value]) => ({
+      _id: name,
+      total: value.total,
+      count: value.count,
+    }))
+    .sort((a, b) => b.total - a.total)
+
+  const drilldown: SpendingDrilldownMap = {}
+  for (const [parent, subMap] of subMapByParent.entries()) {
+    drilldown[parent] = Array.from(subMap.entries())
+      .map(([name, value]) => ({
+        _id: name,
+        total: value.total,
+        count: value.count,
+      }))
+      .sort((a, b) => b.total - a.total)
+  }
+
+  return {parents, drilldown}
+}
+
+function aggregateSimpleSpending(items: SpendingItem[]): SpendingItem[] {
+  const map = new Map<string, {total: number; count: number}>()
+  for (const item of items) {
+    const key = (item._id || "Other").trim() || "Other"
+    const normalizedTotal = Number.isFinite(item.total)
+      ? Math.abs(item.total)
+      : 0
+    const prev = map.get(key) || {total: 0, count: 0}
+    map.set(key, {
+      total: prev.total + normalizedTotal,
+      count: prev.count + (Number.isFinite(item.count) ? item.count : 1),
+    })
+  }
+
+  return Array.from(map.entries())
+    .map(([name, value]) => ({
+      _id: name,
+      total: value.total,
+      count: value.count,
+    }))
+    .sort((a, b) => b.total - a.total)
+}
+
 const TIME_FILTERS = ["1W", "1M", "3M", "6M", "1Y"]
+const BALANCE_TIME_FILTERS = ["1M", "3M", "6M", "1Y", "ALL"]
 
 function getPeriodRange(filter: string): {startDate: string; endDate: string} {
   const now = new Date()
@@ -139,7 +285,6 @@ function getPeriodRange(filter: string): {startDate: string; endDate: string} {
   return {startDate: fmt(start), endDate: fmt(now, true)}
 }
 
-// Format "2026-04-06" → "Apr 6"
 function fmtDate(dateStr: string): string {
   const [y, m, d] = dateStr.split("-").map(Number)
   return new Date(y, m - 1, d).toLocaleDateString("en", {
@@ -148,7 +293,6 @@ function fmtDate(dateStr: string): string {
   })
 }
 
-// Calculate next occurrence based on frequency
 function calculateNextOccurrence(
   current: Date,
   frequency: string,
@@ -161,7 +305,11 @@ function calculateNextOccurrence(
     next.setDate(next.getDate() + 7)
   } else if (frequency === "monthly") {
     next.setMonth(next.getMonth() + 1)
-    // If scheduledDay is set, use it, else keep the same day
+    if (scheduledDay) {
+      next.setDate(scheduledDay)
+    }
+  } else if (frequency === "yearly") {
+    next.setFullYear(next.getFullYear() + 1)
     if (scheduledDay) {
       next.setDate(scheduledDay)
     }
@@ -169,9 +317,17 @@ function calculateNextOccurrence(
   return next
 }
 
-// ============================================================
-// ALLOCATION COLORS (for spending chart)
-// ============================================================
+function parseScheduledDay(value: unknown, fallback: number): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.trunc(value)
+  }
+  if (typeof value === "string") {
+    const match = value.match(/\d+/)
+    if (match) return Number(match[0])
+  }
+  return fallback
+}
+
 const COLORS = [
   "#40c4aa",
   "#005b55",
@@ -182,10 +338,6 @@ const COLORS = [
   "#8b5cf6",
   "#ec4899",
 ]
-
-// ============================================================
-// SUB-COMPONENTS
-// ============================================================
 
 function LoadingSpinner() {
   return (
@@ -206,9 +358,6 @@ function ErrorCard({message}: {message: string}) {
   )
 }
 
-// -------------------------------------------------------
-// HEADER
-// -------------------------------------------------------
 function DashboardHeader({
   summary,
   loading,
@@ -216,10 +365,19 @@ function DashboardHeader({
   summary: SummaryData | null
   loading: boolean
 }) {
+  // Time-based greeting
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour >= 5 && hour < 12) return "Good morning 👋"
+    if (hour >= 12 && hour < 18) return "Good afternoon 👋"
+    if (hour >= 18 && hour < 22) return "Good evening 👋"
+    return "Good night 👋"
+  }
+
   return (
     <div className="flex flex-col gap-[16px] w-full mb-[32px]">
       <h1 className="text-[18px] font-medium text-[#717784] font-['Inter_Tight',sans-serif]">
-        Good morning 👋
+        {getGreeting()}
       </h1>
 
       <div className="flex items-start justify-between w-full">
@@ -303,9 +461,6 @@ function DashboardHeader({
   )
 }
 
-// -------------------------------------------------------
-// CHART CARD (Income / Expense bar chart)
-// -------------------------------------------------------
 function ChartCard({
   title,
   icon: Icon,
@@ -431,23 +586,36 @@ function ChartCard({
   )
 }
 
-// -------------------------------------------------------
-// EXPENSE ALLOCATION (Donut)
-// -------------------------------------------------------
 function ExpenseAllocationWidget({
   data,
+  drilldown,
   loading,
 }: {
   data: SpendingItem[]
+  drilldown: SpendingDrilldownMap
   loading: boolean
 }) {
-  const total = data.reduce((a, d) => a + d.total, 0)
-  const chartData = data.map((d, i) => ({
+  const [selectedParent, setSelectedParent] = useState<string | null>(null)
+
+  useEffect(() => {
+    setSelectedParent(null)
+  }, [data])
+
+  const isDrilldown = selectedParent !== null
+  const sourceData = isDrilldown ? drilldown[selectedParent] || [] : data
+  const total = sourceData.reduce((a, d) => a + d.total, 0)
+  const chartData = sourceData.map((d, i) => ({
     category: d._id,
-    percentage: total > 0 ? Math.round((d.total / total) * 100) : 0,
+    percentage: total > 0 ? Number(((d.total / total) * 100).toFixed(2)) : 0,
     color: COLORS[i % COLORS.length],
     amount: d.total,
   }))
+
+  const handleCategoryClick = (category: string) => {
+    if (isDrilldown) return
+    if (!drilldown[category] || drilldown[category].length === 0) return
+    setSelectedParent(category)
+  }
 
   return (
     <div className="bg-[#191b1f] border border-[#2e2f33] rounded-[16px] p-[24px] flex-1 flex flex-col gap-[24px]">
@@ -456,12 +624,29 @@ function ExpenseAllocationWidget({
           <PieChartIcon size={14} className="text-[#99a0ae]" />
         </div>
         <h2 className="text-[16px] font-medium text-white font-['Inter_Tight',sans-serif]">
-          Expense Allocation
+          {isDrilldown
+            ? `${selectedParent} — Subcategories`
+            : "Expense Allocation"}
         </h2>
+        {isDrilldown && (
+          <button
+            onClick={() => setSelectedParent(null)}
+            className="ml-auto flex items-center gap-[4px] text-[12px] text-[#99a0ae] hover:text-white transition-colors"
+          >
+            <ChevronLeft size={14} />
+            Back
+          </button>
+        )}
       </div>
 
       {loading ? (
         <LoadingSpinner />
+      ) : chartData.length === 0 || total <= 0 ? (
+        <div className="flex items-center justify-center h-[200px]">
+          <span className="text-[16px] text-[#717784] font-['Inter_Tight',sans-serif]">
+            No Expenses
+          </span>
+        </div>
       ) : (
         <div className="flex items-center gap-[24px] h-[200px]">
           {/* Legend */}
@@ -476,12 +661,19 @@ function ExpenseAllocationWidget({
                     className="w-[8px] h-[8px] rounded-full shrink-0"
                     style={{backgroundColor: item.color}}
                   />
-                  <span className="text-[13px] text-[#99a0ae] font-['Inter_Tight',sans-serif] truncate max-w-[100px]">
+                  <button
+                    onClick={() => handleCategoryClick(item.category)}
+                    className={`text-[13px] text-left font-['Inter_Tight',sans-serif] truncate max-w-[140px] transition-colors ${
+                      !isDrilldown && drilldown[item.category]?.length
+                        ? "text-[#99a0ae] hover:text-white"
+                        : "text-[#99a0ae]"
+                    }`}
+                  >
                     {item.category}
-                  </span>
+                  </button>
                 </div>
                 <span className="text-[13px] text-white font-medium font-['Inter_Tight',sans-serif]">
-                  {item.percentage}%
+                  {item.percentage.toFixed(2)}%
                 </span>
               </div>
             ))}
@@ -500,6 +692,9 @@ function ExpenseAllocationWidget({
                   paddingAngle={2}
                   dataKey="percentage"
                   stroke="none"
+                  onClick={(entry: any) =>
+                    handleCategoryClick(entry?.category || "")
+                  }
                 >
                   {chartData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={entry.color} />
@@ -513,7 +708,9 @@ function ExpenseAllocationWidget({
                   }}
                   itemStyle={{color: "#fff"}}
                   formatter={(val: number, name: string, props: any) => [
-                    `LKR ${props.payload.amount?.toLocaleString()} (${val}%)`,
+                    `LKR ${props.payload.amount?.toLocaleString()} (${Number(
+                      val
+                    ).toFixed(2)}%)`,
                     props.payload.category,
                   ]}
                 />
@@ -529,7 +726,7 @@ function ExpenseAllocationWidget({
 
       {!loading && total > 0 && (
         <div className="text-[12px] text-[#717784] font-['Inter_Tight',sans-serif]">
-          Total Expenses:{" "}
+          {isDrilldown ? "Total in selected parent:" : "Total Expenses:"}{" "}
           <span className="text-[#ef4444]">LKR {total.toLocaleString()}</span>
         </div>
       )}
@@ -537,9 +734,6 @@ function ExpenseAllocationWidget({
   )
 }
 
-// -------------------------------------------------------
-// AUTOPILOT TASKS
-// -------------------------------------------------------
 function AutopilotTasksWidget({
   tasks,
   loading,
@@ -569,7 +763,6 @@ function AutopilotTasksWidget({
             {tasks.length}
           </span>
         )}
-        
       </div>
 
       <div className="flex flex-col flex-1 p-[16px] gap-[8px] overflow-y-auto min-h-[120px]">
@@ -577,8 +770,8 @@ function AutopilotTasksWidget({
           <LoadingSpinner />
         ) : tasks.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <span className="text-[13px] text-[#717784] font-['Inter_Tight',sans-serif]">
-              ✅ No pending tasks today
+            <span className="text-[16px] text-[#717784] font-['Inter_Tight',sans-serif]">
+              No pending autopilot tasks
             </span>
           </div>
         ) : (
@@ -653,9 +846,6 @@ function AutopilotTasksWidget({
   )
 }
 
-// -------------------------------------------------------
-// NET WORTH (Balance chart)
-// -------------------------------------------------------
 function NetWorthWidget({
   data,
   loading,
@@ -663,9 +853,27 @@ function NetWorthWidget({
   data: ChartPoint[]
   loading: boolean
 }) {
-  const chartData = data.map((d) => ({month: fmtDate(d._id), value: d.total}))
-  const latest = data[data.length - 1]?.total ?? 0
-  const prev = data[data.length - 2]?.total ?? 0
+  const [activeFilter, setActiveFilter] = useState("6M")
+
+  const sortedData = [...data].sort(
+    (a, b) => new Date(a._id).getTime() - new Date(b._id).getTime()
+  )
+
+  const filteredData =
+    activeFilter === "ALL"
+      ? sortedData
+      : (() => {
+          const {startDate} = getPeriodRange(activeFilter)
+          const start = new Date(startDate)
+          return sortedData.filter((point) => new Date(point._id) >= start)
+        })()
+
+  const chartData = filteredData.map((d) => ({
+    month: fmtDate(d._id),
+    value: d.total,
+  }))
+  const latest = filteredData[filteredData.length - 1]?.total ?? 0
+  const prev = filteredData[filteredData.length - 2]?.total ?? 0
   const change = prev > 0 ? (((latest - prev) / prev) * 100).toFixed(1) : null
 
   return (
@@ -679,20 +887,37 @@ function NetWorthWidget({
             Total Balance Over Time
           </h2>
         </div>
-        {change && (
-          <div
-            className={`flex items-center gap-[4px] text-[13px] font-medium ${
-              Number(change) >= 0 ? "text-[#40c4aa]" : "text-[#ef4444]"
-            }`}
-          >
-            {Number(change) >= 0 ? (
-              <ArrowUpRight size={16} />
-            ) : (
-              <ArrowDownRight size={16} />
-            )}
-            {change}% vs prev period
+        <div className="flex items-center gap-[12px]">
+          <div className="flex justify-between items-center bg-[#101214] p-[4px] rounded-[8px] border border-[#2e2f33]">
+            {BALANCE_TIME_FILTERS.map((filter) => (
+              <button
+                key={filter}
+                onClick={() => setActiveFilter(filter)}
+                className={`px-[10px] py-[4px] rounded-[6px] text-[12px] font-medium transition-colors ${
+                  activeFilter === filter
+                    ? "bg-[#2e2f33] text-white"
+                    : "text-[#717784] hover:text-[#99a0ae]"
+                }`}
+              >
+                {filter}
+              </button>
+            ))}
           </div>
-        )}
+          {change && (
+            <div
+              className={`flex items-center gap-[4px] text-[13px] font-medium ${
+                Number(change) >= 0 ? "text-[#40c4aa]" : "text-[#ef4444]"
+              }`}
+            >
+              {Number(change) >= 0 ? (
+                <ArrowUpRight size={16} />
+              ) : (
+                <ArrowDownRight size={16} />
+              )}
+              {change}% vs prev point
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="h-[240px] w-full">
@@ -759,15 +984,13 @@ function NetWorthWidget({
   )
 }
 
-// ============================================================
-// MAIN DASHBOARD COMPONENT
-// ============================================================
 export function Dashboard() {
   const [state, setState] = useState<DashboardState>({
     summary: null,
     incomeChart: [],
     balanceChart: [],
     spending: [],
+    spendingDrilldown: {},
     autopilot: [],
     loading: true,
     error: null,
@@ -777,27 +1000,47 @@ export function Dashboard() {
     setState((prev) => ({...prev, loading: true, error: null}))
 
     try {
-      // Build date range for the current month (for balance chart)
-      const now = new Date()
-      const pad = (n: number) => String(n).padStart(2, "0")
-      const monthStart = `${now.getFullYear()}-${pad(
-        now.getMonth() + 1
-      )}-01T00:00:00.000Z`
-      const monthEnd = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
-        new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
-      )}T23:59:59.999Z`
+      const [
+        summaryRes,
+        balanceRes,
+        spendingRes,
+        autopilotRes,
+        transactionsRes,
+      ] = await Promise.allSettled([
+        apiFetch<any>("/api/transactions/dashboard/summary"),
+        apiFetch<any>("/api/transactions/dashboard/chart"),
+        apiFetch<any>("/api/transactions/dashboard/spending"),
+        apiFetch<any>("/api/transactions/autopilot/"),
+        apiFetch<any>("/api/transactions"),
+      ])
 
-      const [summaryRes, balanceRes, spendingRes, autopilotRes] =
-        await Promise.allSettled([
-          apiFetch<any>("/api/transactions/dashboard/summary"),
-          apiFetch<any>(
-            `/api/transactions/dashboard/chart?startDate=${encodeURIComponent(
-              monthStart
-            )}&endDate=${encodeURIComponent(monthEnd)}`
-          ),
-          apiFetch<any>("/api/transactions/dashboard/spending"),
-          apiFetch<any>("/api/transactions/autopilot/"),
-        ])
+      const summaryData: SummaryData | null =
+        summaryRes.status === "fulfilled"
+          ? summaryRes.value?.data ?? null
+          : null
+
+      const rawTransactions: RawTransactionItem[] =
+        transactionsRes.status === "fulfilled"
+          ? transactionsRes.value?.data ?? []
+          : []
+
+      const spendingFromTransactions =
+        transactionsRes.status === "fulfilled"
+          ? aggregateExpenseHierarchy(rawTransactions)
+          : {parents: [], drilldown: {}}
+
+      const spendingFromEndpoint: SpendingItem[] =
+        spendingRes.status === "fulfilled" ? spendingRes.value?.data ?? [] : []
+
+      const finalSpendingData =
+        spendingFromTransactions.parents.length > 0
+          ? spendingFromTransactions.parents
+          : aggregateSimpleSpending(spendingFromEndpoint)
+
+      const finalSpendingDrilldown: SpendingDrilldownMap =
+        spendingFromTransactions.parents.length > 0
+          ? spendingFromTransactions.drilldown
+          : {}
 
       const allFlows: AutopilotFlow[] =
         autopilotRes.status === "fulfilled"
@@ -825,55 +1068,26 @@ export function Dashboard() {
           }`,
         }))
 
-      // Fallback mock data if no pending tasks from backend
-      if (pendingTasks.length === 0 && allFlows.length === 0) {
-        pendingTasks = [
-          {
-            _id: "mock1",
-            flowName: "Apartment Rent",
-            amount: -1250,
-            type: "expense",
-            parentCategory: "Housing",
-            subCategory: "",
-            frequency: "monthly",
-            scheduledDay: 1,
-            nextOccurrence: "2026-04-10T00:00:00.000Z",
-            isActive: true,
-            userId: "mock",
-            name: "Apartment Rent",
-            category: "Housing",
-          },
-          {
-            _id: "mock2",
-            flowName: "Monthly Salary",
-            amount: 125000,
-            type: "income",
-            parentCategory: "Salary",
-            subCategory: "",
-            frequency: "monthly",
-            scheduledDay: 1,
-            nextOccurrence: "2026-04-10T00:00:00.000Z",
-            isActive: true,
-            userId: "mock",
-            name: "Monthly Salary",
-            category: "Salary",
-          },
-        ]
-      }
-
       console.log("Pending tasks:", pendingTasks)
 
+      const balanceFromTransactions = buildBalanceOverTime(
+        rawTransactions,
+        summaryData?.totalBalance
+      )
+
+      const fallbackBalance: ChartPoint[] =
+        balanceRes.status === "fulfilled" ? balanceRes.value?.data ?? [] : []
+
+      const finalBalanceData =
+        balanceFromTransactions.length > 0
+          ? balanceFromTransactions
+          : fallbackBalance
+
       setState({
-        summary:
-          summaryRes.status === "fulfilled"
-            ? summaryRes.value?.data ?? null
-            : null,
-        balanceChart:
-          balanceRes.status === "fulfilled" ? balanceRes.value?.data ?? [] : [],
-        spending:
-          spendingRes.status === "fulfilled"
-            ? spendingRes.value?.data ?? []
-            : [],
+        summary: summaryData,
+        balanceChart: finalBalanceData,
+        spending: finalSpendingData,
+        spendingDrilldown: finalSpendingDrilldown,
         autopilot: pendingTasks,
         incomeChart: [],
         loading: false,
@@ -892,48 +1106,51 @@ export function Dashboard() {
     fetchAll()
   }, [fetchAll])
 
-  // ===== AUTOPILOT ACTIONS =====
-  const handleLogTask = async (id: string) => {
-    if (id.startsWith("mock")) {
-      // For mock data, just remove from state
-      setState((prev) => ({
-        ...prev,
-        autopilot: prev.autopilot.filter((t) => t._id !== id),
-      }))
-      return
-    }
+  const syncAutopilotNextOccurrence = useCallback(
+    async (task: AutopilotTask, includeLastRun: boolean) => {
+      const nextOccurrence = calculateNextOccurrence(
+        new Date(),
+        task.frequency,
+        parseScheduledDay(task.scheduledDay, 1)
+      )
 
+      const payload: Record<string, unknown> = {
+        nextOccurrence: nextOccurrence.toISOString(),
+      }
+
+      if (includeLastRun) {
+        payload.lastRun = new Date().toISOString()
+      }
+
+      await apiFetch(`/api/transactions/autopilot/${task._id}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      })
+    },
+    []
+  )
+
+  const handleLogTask = async (id: string) => {
     try {
       const task = state.autopilot.find((t) => t._id === id)
       if (!task) return
 
-      // Create transaction
       const transactionData = {
         amount: task.amount,
         type: task.type,
-        category: task.parentCategory,
+        parentCategory: task.parentCategory,
         subCategory: task.subCategory,
         date: new Date().toISOString(),
+        note: `Autopilot: ${task.flowName}`,
         notes: `Autopilot: ${task.flowName}`,
       }
+
       await apiFetch("/api/transactions", {
         method: "POST",
         body: JSON.stringify(transactionData),
       })
 
-      // Update autopilot nextOccurrence
-      const nextOccurrence = calculateNextOccurrence(
-        new Date(),
-        task.frequency,
-        task.scheduledDay
-      )
-      await apiFetch(`/api/autopilot/${id}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          nextOccurrence: nextOccurrence.toISOString(),
-          lastRun: new Date().toISOString(),
-        }),
-      })
+      await syncAutopilotNextOccurrence(task, true)
 
       fetchAll()
     } catch (e) {
@@ -943,18 +1160,40 @@ export function Dashboard() {
   }
 
   const handleSkipTask = async (id: string) => {
-    // For skip, just remove from local state (skip for today)
-    setState((prev) => ({
-      ...prev,
-      autopilot: prev.autopilot.filter((t) => t._id !== id),
-    }))
+    try {
+      const task = state.autopilot.find((t) => t._id === id)
+      if (!task) return
+
+      await syncAutopilotNextOccurrence(task, false)
+      fetchAll()
+    } catch (e) {
+      console.error(e)
+      setState((prev) => ({...prev, error: "Failed to skip task"}))
+    }
   }
 
   const handleLogAll = async () => {
     try {
-      for (const task of state.autopilot) {
-        await handleLogTask(task._id)
+      const tasks = [...state.autopilot]
+      for (const task of tasks) {
+        const transactionData = {
+          amount: task.amount,
+          type: task.type,
+          parentCategory: task.parentCategory,
+          subCategory: task.subCategory,
+          date: new Date().toISOString(),
+          note: `Autopilot: ${task.flowName}`,
+          notes: `Autopilot: ${task.flowName}`,
+        }
+
+        await apiFetch("/api/transactions", {
+          method: "POST",
+          body: JSON.stringify(transactionData),
+        })
+        await syncAutopilotNextOccurrence(task, true)
       }
+
+      fetchAll()
     } catch (e) {
       console.error(e)
       setState((prev) => ({...prev, error: "Failed to log all tasks"}))
@@ -962,7 +1201,16 @@ export function Dashboard() {
   }
 
   const handleSkipAll = async () => {
-    setState((prev) => ({...prev, autopilot: []}))
+    try {
+      const tasks = [...state.autopilot]
+      await Promise.all(
+        tasks.map((task) => syncAutopilotNextOccurrence(task, false))
+      )
+      fetchAll()
+    } catch (e) {
+      console.error(e)
+      setState((prev) => ({...prev, error: "Failed to skip all tasks"}))
+    }
   }
 
   return (
@@ -1007,6 +1255,7 @@ export function Dashboard() {
         <div className="grid grid-cols-2 gap-[24px] w-full">
           <ExpenseAllocationWidget
             data={state.spending}
+            drilldown={state.spendingDrilldown}
             loading={state.loading}
           />
           <AutopilotTasksWidget

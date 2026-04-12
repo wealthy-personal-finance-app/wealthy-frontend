@@ -6,6 +6,9 @@ import {
   MonthlySelector,
   YearlySelector,
 } from "./ScheduleSelectors"
+import {getAuthToken} from "../../utils/auth"
+import {apiFetchJson} from "../../apis/client"
+import {ENDPOINTS} from "../../apis/endpoints"
 
 export interface CategoryData {
   id: string
@@ -35,23 +38,6 @@ const fallbackMasterCategories = [
   "Liquid Assets",
   "Short-Term Liabilities",
 ]
-
-const POSSIBLE_TOKEN_KEYS = [
-  "token",
-  "accessToken",
-  "authToken",
-  "jwt",
-  "wealthyToken",
-  "wealthy_token",
-]
-
-function getAuthToken(): string | null {
-  for (const key of POSSIBLE_TOKEN_KEYS) {
-    const token = localStorage.getItem(key)
-    if (token) return token
-  }
-  return null
-}
 
 interface AddNewAutopilotDrawerProps {
   onClose: () => void
@@ -101,15 +87,15 @@ export function AddNewAutopilotDrawer({
           setIsLoadingCategories(false)
           return
         }
-        const res = await fetch(
-          "http://localhost:5000/api/transactions/categories",
+        const {response: res, data: result} = await apiFetchJson<any>(
+          ENDPOINTS.transactions.categories,
           {
-            headers: {Authorization: `Bearer ${token}`},
+            method: "GET",
+            auth: true,
           }
         )
 
         if (res.ok) {
-          const result = await res.json()
           const nestedData = result.data || {}
 
           const flattenCategories = (typeKey: string): CategoryData[] => {
@@ -216,13 +202,13 @@ export function AddNewAutopilotDrawer({
     try {
       const token = getAuthToken()
       if (!token) return
-      const res = await fetch(
-        "http://localhost:5000/api/transactions/categories",
+      const {response: res} = await apiFetchJson(
+        ENDPOINTS.transactions.categories,
         {
           method: "POST",
+          auth: true,
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify(payload),
         }

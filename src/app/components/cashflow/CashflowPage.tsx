@@ -1,151 +1,363 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { ResponsiveSankey } from '@nivo/sankey';
-import { ChevronDown, Calendar, TrendingUp, TrendingDown, Activity, ChevronLeft, ZoomIn } from 'lucide-react';
-import * as Select from '@radix-ui/react-select';
-import { toast } from 'sonner';
-import mockData from '../../data/mockCashflowData.json';
+import React, {useState, useEffect, useCallback} from "react"
+import {ResponsiveSankey} from "@nivo/sankey"
+import {
+  ChevronDown,
+  Calendar,
+  TrendingUp,
+  TrendingDown,
+  Activity,
+  ChevronLeft,
+  ZoomIn,
+} from "lucide-react"
+import * as Select from "@radix-ui/react-select"
+import {toast} from "sonner"
+import {getAuthToken} from "../../utils/auth"
+import {apiFetchJson} from "../../apis/client"
+import {ENDPOINTS} from "../../apis/endpoints"
 
 interface SankeyNode {
-  id: string;
-  color?: string;
-  cluster?: string;
+  id: string
+  color?: string
+  cluster?: string
 }
 
 interface SankeyLink {
-  source: string;
-  target: string;
-  value: number;
+  source: string
+  target: string
+  value: number
 }
 
 interface ChartData {
-  nodes: SankeyNode[];
-  links: SankeyLink[];
+  nodes: SankeyNode[]
+  links: SankeyLink[]
 }
 
 interface CashflowData {
-  nodes: SankeyNode[];
-  links: SankeyLink[];
-  drilldown: Record<string, ChartData>;
+  nodes: SankeyNode[]
+  links: SankeyLink[]
+  drilldown: Record<string, ChartData>
   summary: {
-    totalIn: number;
-    totalOut: number;
-    netFlow: number;
-  };
+    totalIn: number
+    totalOut: number
+    netFlow: number
+  }
 }
 
-// --- Drillable node IDs (all except the hub) ---
-const DRILLABLE_NODES = new Set([
-  'Active Income', 'Asset Income', 'Other Income',
-  'Essential Living', 'Obligations & Liabilities',
-  'Discretionary & Lifestyle', 'Growth & Giving', 'Unplanned',
-]);
+interface RawTransaction {
+  _id?: string
+  amount?: number | string
+  type?: string
+  parentCategory?: string
+  subCategory?: string
+  date?: string
+}
 
-function StatCard({ label, value, color, icon: Icon }: { label: string; value: number; color: string; icon: any }) {
+const TRANSACTIONS_ENDPOINT = ENDPOINTS.transactions.base
+
+function toAmount(value: unknown): number {
+  const amount = Number(value)
+  return Number.isFinite(amount) ? Math.abs(amount) : 0
+}
+
+function getRangeForPeriod(period: string): {
+  start: Date | null
+  end: Date | null
+} {
+  const end = new Date()
+  const start = new Date(end)
+
+  if (period === "1M") {
+    start.setMonth(end.getMonth() - 1)
+    return {start, end}
+  }
+  if (period === "3M") {
+    start.setMonth(end.getMonth() - 3)
+    return {start, end}
+  }
+  if (period === "6M") {
+    start.setMonth(end.getMonth() - 6)
+    return {start, end}
+  }
+  if (period === "1Y") {
+    start.setFullYear(end.getFullYear() - 1)
+    return {start, end}
+  }
+  return {start: null, end: null}
+}
+
+function isInRange(dateText: string | undefined, period: string): boolean {
+  const {start, end} = getRangeForPeriod(period)
+  if (!start || !end) return true
+  if (!dateText) return false
+  const date = new Date(dateText)
+  if (Number.isNaN(date.getTime())) return false
+  return date >= start && date <= end
+}
+
+function buildCashflowData(transactions: RawTransaction[]): CashflowData {
+  const parentIncomeTotals = new Map<string, number>()
+  const parentExpenseTotals = new Map<string, number>()
+  const drilldownBuckets = new Map<string, Map<string, number>>()
+
+  let totalIn = 0
+  let totalOut = 0
+
+  for (const tx of transactions) {
+    const txType = String(tx.type || "").toLowerCase()
+    const amount = toAmount(tx.amount)
+    if (!amount) continue
+
+    const parent = (tx.parentCategory || "Other").trim()
+    const child = (tx.subCategory || "Other").trim()
+
+    if (txType === "income") {
+      parentIncomeTotals.set(
+        parent,
+        (parentIncomeTotals.get(parent) || 0) + amount
+      )
+      if (!drilldownBuckets.has(parent)) drilldownBuckets.set(parent, new Map())
+      const entries = drilldownBuckets.get(parent)!
+      entries.set(child, (entries.get(child) || 0) + amount)
+      totalIn += amount
+      continue
+    }
+
+    if (txType === "expense" || txType === "liability" || txType === "asset") {
+      parentExpenseTotals.set(
+        parent,
+        (parentExpenseTotals.get(parent) || 0) + amount
+      )
+      if (!drilldownBuckets.has(parent)) drilldownBuckets.set(parent, new Map())
+      const entries = drilldownBuckets.get(parent)!
+      entries.set(child, (entries.get(child) || 0) + amount)
+      totalOut += amount
+    }
+  }
+
+  const nodes: SankeyNode[] = []
+  const links: SankeyLink[] = []
+  const drilldown: Record<string, ChartData> = {}
+  const nodeSet = new Set<string>()
+
+  const pushNode = (id: string, color: string, cluster: string) => {
+    if (nodeSet.has(id)) return
+    nodeSet.add(id)
+    nodes.push({id, color, cluster})
+  }
+
+  const pushDrilldown = (bucket: string, color: string) => {
+    const subMap = drilldownBuckets.get(bucket)
+    if (!subMap || subMap.size === 0) return
+    const subNodes: SankeyNode[] = [{id: bucket, color}]
+    const subLinks: SankeyLink[] = []
+    for (const [name, value] of subMap.entries()) {
+      subNodes.push({id: name, color})
+      subLinks.push({source: bucket, target: name, value})
+    }
+    drilldown[bucket] = {nodes: subNodes, links: subLinks}
+  }
+
+  const hubId = "Total Cash Flow"
+  pushNode(hubId, "#5A6B89", "hub")
+
+  for (const [parent, value] of parentIncomeTotals.entries()) {
+    if (!value) continue
+    pushNode(parent, "#22C55E", "income")
+    links.push({source: parent, target: hubId, value})
+    pushDrilldown(parent, "#10B981")
+  }
+
+  for (const [parent, value] of parentExpenseTotals.entries()) {
+    if (!value) continue
+    pushNode(parent, "#F43F5E", "expenses")
+    links.push({source: hubId, target: parent, value})
+    pushDrilldown(parent, "#F43F5E")
+  }
+
+  return {
+    nodes,
+    links,
+    drilldown,
+    summary: {
+      totalIn,
+      totalOut,
+      netFlow: totalIn - totalOut,
+    },
+  }
+}
+
+function StatCard({
+  label,
+  value,
+  color,
+  icon: Icon,
+}: {
+  label: string
+  value: number
+  color: string
+  icon: any
+}) {
   return (
     <div className="bg-[#191b1f] border border-[#2e2f33] rounded-[16px] p-[20px] flex-1 flex flex-col gap-[12px]">
       <div className="flex items-center gap-[8px]">
         <div className="size-[32px] rounded-[8px] flex items-center justify-center bg-white/[0.03] border border-white/[0.03]">
           <Icon size={18} color={color} />
         </div>
-        <p className="text-[#99a0ae] text-[14px] font-medium font-['Inter_Tight',sans-serif]">{label}</p>
+        <p className="text-[#99a0ae] text-[14px] font-medium font-['Inter_Tight',sans-serif]">
+          {label}
+        </p>
       </div>
-      <p style={{ color }} className="text-[24px] font-bold font-['Inter_Tight',sans-serif]">
+      <p
+        style={{color}}
+        className="text-[24px] font-bold font-['Inter_Tight',sans-serif]"
+      >
         LKR {value.toLocaleString()}
       </p>
     </div>
-  );
+  )
 }
 
 export function CashflowPage() {
-  const [data, setData] = useState<CashflowData | null>(null);
-  const [period, setPeriod] = useState('april-2026');
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<CashflowData | null>(null)
+  const [period, setPeriod] = useState("1M")
+  const [loading, setLoading] = useState(true)
 
   // Drill-down state
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null)
+  const [isTransitioning, setIsTransitioning] = useState(false)
 
   useEffect(() => {
     async function fetchCashflowData() {
-      setLoading(true);
+      setLoading(true)
       try {
-        await new Promise(resolve => setTimeout(resolve, 800));
-        setData(mockData as CashflowData);
+        const token = getAuthToken()
+        if (!token) {
+          throw new Error("Please sign in to view cash flow data.")
+        }
+
+        const {response, data: payload} = await apiFetchJson<unknown>(
+          TRANSACTIONS_ENDPOINT,
+          {
+            method: "GET",
+            auth: true,
+            headers: {
+              "Content-Type": "application/json",
+            },
+          }
+        )
+
+        if (!response.ok) {
+          throw new Error(`Failed to load cash flow data (${response.status})`)
+        }
+
+        const raw = payload as Record<string, unknown> | null
+        const list = Array.isArray(raw?.data)
+          ? (raw?.data as RawTransaction[])
+          : Array.isArray(payload)
+          ? (payload as RawTransaction[])
+          : []
+
+        const filtered = list.filter((item) => isInRange(item.date, period))
+        setData(buildCashflowData(filtered))
       } catch (error) {
-        console.error('Error fetching cashflow data:', error);
+        console.error("Error fetching cashflow data:", error)
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "Failed to load cash flow data"
+        )
+        setData({
+          nodes: [],
+          links: [],
+          drilldown: {},
+          summary: {totalIn: 0, totalOut: 0, netFlow: 0},
+        })
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
     }
-    fetchCashflowData();
-  }, [period]);
+    fetchCashflowData()
+  }, [period])
 
   // Reset drilldown on period change
   useEffect(() => {
-    setActiveCategory(null);
-  }, [period]);
+    setActiveCategory(null)
+  }, [period])
 
   const periods = [
-    { value: 'april-2026', label: 'April 2026' },
-    { value: 'march-2026', label: 'March 2026' },
-    { value: 'last-quarter', label: 'Last Quarter' },
-    { value: 'all-time', label: 'All time' },
-  ];
+    {value: "1M", label: "Last 1 Month"},
+    {value: "3M", label: "Last 3 Months"},
+    {value: "6M", label: "Last 6 Months"},
+    {value: "1Y", label: "Last 1 Year"},
+    {value: "ALL", label: "All Time"},
+  ]
 
   const triggerTransition = useCallback((fn: () => void) => {
-    setIsTransitioning(true);
+    setIsTransitioning(true)
     setTimeout(() => {
-      fn();
-      setIsTransitioning(false);
-    }, 250);
-  }, []);
+      fn()
+      setIsTransitioning(false)
+    }, 250)
+  }, [])
 
-  const handleNodeClick = useCallback((node: any) => {
-    if (!data) return;
-    const nodeId = node.id;
-    if (activeCategory !== null) return; // Already at Level 2 — no deeper
-    if (!DRILLABLE_NODES.has(nodeId)) return; // Hub node — not drillable
-    if (!data.drilldown[nodeId]) return;
+  const handleNodeClick = useCallback(
+    (node: any) => {
+      if (!data) return
+      const nodeId = node.id
+      if (activeCategory !== null) return // Already at Level 2 — no deeper
+      if (!data.drilldown[nodeId]) return
 
-    triggerTransition(() => {
-      setActiveCategory(nodeId);
-      toast.info(`Zooming into "${nodeId}"`, { duration: 2000 });
-    });
-  }, [data, activeCategory, triggerTransition]);
+      triggerTransition(() => {
+        setActiveCategory(nodeId)
+        toast.info(`Zooming into "${nodeId}"`, {duration: 2000})
+      })
+    },
+    [data, activeCategory, triggerTransition]
+  )
 
   const handleBackToOverview = useCallback(() => {
     triggerTransition(() => {
-      setActiveCategory(null);
-    });
-  }, [triggerTransition]);
+      setActiveCategory(null)
+    })
+  }, [triggerTransition])
 
   if (loading || !data) {
     return (
       <div className="flex-1 flex items-center justify-center h-full">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#10B981]"></div>
       </div>
-    );
+    )
   }
 
   // Determine which chart data to show
-  const isDetailView = activeCategory !== null;
-  const chartData: ChartData = isDetailView && data.drilldown[activeCategory]
-    ? data.drilldown[activeCategory]
-    : { nodes: data.nodes, links: data.links };
+  const isDetailView = activeCategory !== null
+  const chartData: ChartData =
+    isDetailView && data.drilldown[activeCategory]
+      ? data.drilldown[activeCategory]
+      : {nodes: data.nodes, links: data.links}
 
   // Determine the accent color of the active category
   const activeCategoryColor = isDetailView
-    ? (data.nodes.find(n => n.id === activeCategory)?.color || '#606980')
-    : null;
+    ? data.nodes.find((n) => n.id === activeCategory)?.color || "#606980"
+    : null
 
   // Summary cards for drilldown: show the split of that category's sub-items
   const drilldownTotal = isDetailView
-    ? (data.drilldown[activeCategory]?.links.reduce((sum, l) => sum + l.value, 0) ?? 0)
-    : 0;
+    ? data.drilldown[activeCategory]?.links.reduce(
+        (sum, l) => sum + l.value,
+        0
+      ) ?? 0
+    : 0
+  const largestItemValue =
+    isDetailView && chartData.links.length > 0
+      ? Math.max(...chartData.links.map((l) => l.value))
+      : 0
+  const nodeColorMap = new Map(
+    chartData.nodes.map((node) => [node.id, node.color || "#5A6B89"])
+  )
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#0B0C0E] overflow-y-auto p-[32px] gap-[16px] scrollbar-hide">
-
       {/* Overview Cards Row */}
       <div className="flex gap-[16px] w-full shrink-0">
         {isDetailView ? (
@@ -161,12 +373,16 @@ export function CashflowPage() {
                 <Activity size={20} color="#606980" />
               </div>
               <div className="flex flex-col gap-[4px]">
-                <p className="text-[#717784] text-[13px] font-medium font-['Inter_Tight',sans-serif]">Sub-categories</p>
+                <p className="text-[#717784] text-[13px] font-medium font-['Inter_Tight',sans-serif]">
+                  Sub-categories
+                </p>
                 <p className="text-[22px] font-bold font-['Inter_Tight',sans-serif]">
-                  <span style={{ color: activeCategoryColor! }}>
+                  <span style={{color: activeCategoryColor!}}>
                     {chartData.links.length}
                   </span>
-                  <span className="text-[#717784] text-[14px] font-medium ml-[6px]">items</span>
+                  <span className="text-[#717784] text-[14px] font-medium ml-[6px]">
+                    items
+                  </span>
                 </p>
               </div>
             </div>
@@ -175,11 +391,13 @@ export function CashflowPage() {
                 <TrendingDown size={20} color="#717784" />
               </div>
               <div className="flex flex-col gap-[4px]">
-                <p className="text-[#717784] text-[13px] font-medium font-['Inter_Tight',sans-serif]">Largest Item</p>
+                <p className="text-[#717784] text-[13px] font-medium font-['Inter_Tight',sans-serif]">
+                  Largest Item
+                </p>
                 <p className="text-[22px] font-bold font-['Inter_Tight',sans-serif]">
                   <span className="text-white">LKR </span>
-                  <span style={{ color: activeCategoryColor! }}>
-                    {Math.max(...chartData.links.map(l => l.value)).toLocaleString()}
+                  <span style={{color: activeCategoryColor!}}>
+                    {largestItemValue.toLocaleString()}
                   </span>
                 </p>
               </div>
@@ -187,16 +405,30 @@ export function CashflowPage() {
           </>
         ) : (
           <>
-            <StatCard label="Total In" value={data.summary.totalIn} color="#10B981" icon={TrendingUp} />
-            <StatCard label="Total Out" value={data.summary.totalOut} color="#EF4444" icon={TrendingDown} />
-            <StatCard label="Net Flow" value={data.summary.netFlow} color="#3B82F6" icon={Activity} />
+            <StatCard
+              label="Total In"
+              value={data.summary.totalIn}
+              color="#10B981"
+              icon={TrendingUp}
+            />
+            <StatCard
+              label="Total Out"
+              value={data.summary.totalOut}
+              color="#EF4444"
+              icon={TrendingDown}
+            />
+            <StatCard
+              label="Net Flow"
+              value={data.summary.netFlow}
+              color="#3B82F6"
+              icon={Activity}
+            />
           </>
         )}
       </div>
 
       {/* Main Sankey Card */}
       <div className="flex-1 bg-[#191b1f] border border-[#2e2f33] rounded-[16px] p-[40px] flex flex-col relative min-h-[600px]">
-
         {/* Card Header */}
         <div className="flex justify-between items-center mb-[40px] shrink-0">
           <div className="flex flex-col gap-[8px]">
@@ -206,19 +438,24 @@ export function CashflowPage() {
                 onClick={handleBackToOverview}
                 className="flex items-center gap-[6px] text-[#717784] hover:text-white transition-colors w-fit group"
               >
-                <ChevronLeft size={14} className="group-hover:-translate-x-0.5 transition-transform" />
-                <span className="text-[12px] font-medium font-['Inter_Tight',sans-serif]">Back to Overview</span>
+                <ChevronLeft
+                  size={14}
+                  className="group-hover:-translate-x-0.5 transition-transform"
+                />
+                <span className="text-[12px] font-medium font-['Inter_Tight',sans-serif]">
+                  Back to Overview
+                </span>
               </button>
             )}
             <div className="flex items-center gap-[10px]">
               <div>
                 <h1 className="text-white text-[20px] font-semibold font-['Inter_Tight',sans-serif]">
-                  {isDetailView ? activeCategory : 'Cash Flow Pipeline'}
+                  {isDetailView ? activeCategory : "Cash Flow Pipeline"}
                 </h1>
                 <p className="text-[#717784] text-[13px]">
                   {isDetailView
                     ? `Breakdown of ${activeCategory} spending`
-                    : 'Visualized movement of funds across your ecosystem'}
+                    : "Visualized movement of funds across your ecosystem"}
                 </p>
               </div>
             </div>
@@ -226,11 +463,14 @@ export function CashflowPage() {
 
           <div className="flex items-center gap-[16px]">
             {/* Level badge */}
-            <div className={`px-[10px] py-[4px] rounded-full text-[11px] font-semibold font-['Inter_Tight',sans-serif] border transition-all ${isDetailView
-              ? 'bg-[#10B981]/10 border-[#10B981]/20 text-[#10B981]'
-              : 'bg-white/[0.03] border-white/[0.06] text-[#717784]'
-              }`}>
-              {isDetailView ? 'Level 2 — Detail' : 'Level 1 — Overview'}
+            <div
+              className={`px-[10px] py-[4px] rounded-full text-[11px] font-semibold font-['Inter_Tight',sans-serif] border transition-all ${
+                isDetailView
+                  ? "bg-[#10B981]/10 border-[#10B981]/20 text-[#10B981]"
+                  : "bg-white/[0.03] border-white/[0.06] text-[#717784]"
+              }`}
+            >
+              {isDetailView ? "Level 2 — Detail" : "Level 1 — Overview"}
             </div>
 
             {/* Legend */}
@@ -238,11 +478,15 @@ export function CashflowPage() {
               <div className="flex gap-[16px] items-center">
                 <div className="flex items-center gap-[6px]">
                   <div className="size-[8px] rounded-full bg-[#10B981]" />
-                  <span className="text-[#99a0ae] text-[11px] font-medium uppercase tracking-wider">Inflows</span>
+                  <span className="text-[#99a0ae] text-[11px] font-medium uppercase tracking-wider">
+                    Inflows
+                  </span>
                 </div>
                 <div className="flex items-center gap-[6px]">
                   <div className="size-[8px] rounded-full bg-[#EF4444]" />
-                  <span className="text-[#99a0ae] text-[11px] font-medium uppercase tracking-wider">Outflows</span>
+                  <span className="text-[#99a0ae] text-[11px] font-medium uppercase tracking-wider">
+                    Outflows
+                  </span>
                 </div>
               </div>
             )}
@@ -250,7 +494,7 @@ export function CashflowPage() {
         </div>
 
         {/* Hint banner — only on overview */}
-        {!isDetailView && (
+        {!isDetailView && chartData.links.length > 0 && (
           <div className="flex items-center gap-[8px] mb-[24px] px-[12px] py-[8px] bg-white/[0.02] border border-white/[0.05] rounded-[8px] w-fit shrink-0">
             <ZoomIn size={13} className="text-[#606980]" />
             <span className="text-[#717784] text-[12px] font-medium font-['Inter_Tight',sans-serif]">
@@ -262,52 +506,58 @@ export function CashflowPage() {
         {/* The Sankey Chart — fades on transition */}
         <div
           className="flex-1 w-full relative transition-opacity duration-250"
-          style={{ opacity: isTransitioning ? 0 : 1 }}
+          style={{opacity: isTransitioning ? 0 : 1}}
         >
-          <ResponsiveSankey
-            data={chartData}
-            margin={{ top: 20, right: 160, bottom: 20, left: 160 }}
-            align="justify"
-            colors={node => node.color || '#5A6B89'}
-            nodeOpacity={1}
-            nodeThickness={18}
-            nodeInnerPadding={2}
-            nodeSpacing={40}
-            nodeBorderWidth={0}
-            nodeBorderRadius={4}
-            linkOpacity={0.35}
-            linkHoverOpacity={0.65}
-            linkHoverOthersOpacity={0.1}
-            enableLinkGradient={true}
-            labelPosition="outside"
-            labelOrientation="horizontal"
-            labelPadding={20}
-            labelTextColor="#99a0ae"
-            onClick={handleNodeClick}
-            theme={{
-              tooltip: {
-                container: {
-                  background: '#15161a',
-                  color: '#fff',
-                  fontSize: 12,
-                  borderRadius: 8,
-                  border: '1px solid #2e2f33',
-                  padding: '12px',
-                  boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
+          {chartData.links.length === 0 ? (
+            <div className="h-full w-full flex items-center justify-center text-[#717784] text-[14px] font-medium font-['Inter_Tight',sans-serif]">
+              No cash flow data available for the selected period.
+            </div>
+          ) : (
+            <ResponsiveSankey
+              data={chartData}
+              margin={{top: 20, right: 160, bottom: 20, left: 160}}
+              align="justify"
+              colors={(node) => nodeColorMap.get(String(node.id)) || "#5A6B89"}
+              nodeOpacity={1}
+              nodeThickness={18}
+              nodeInnerPadding={2}
+              nodeSpacing={40}
+              nodeBorderWidth={0}
+              nodeBorderRadius={4}
+              linkOpacity={0.35}
+              linkHoverOpacity={0.65}
+              linkHoverOthersOpacity={0.1}
+              enableLinkGradient={true}
+              labelPosition="outside"
+              labelOrientation="horizontal"
+              labelPadding={20}
+              labelTextColor="#99a0ae"
+              onClick={handleNodeClick}
+              theme={{
+                tooltip: {
+                  container: {
+                    background: "#15161a",
+                    color: "#fff",
+                    fontSize: 12,
+                    borderRadius: 8,
+                    border: "1px solid #2e2f33",
+                    padding: "12px",
+                    boxShadow: "0 10px 40px rgba(0,0,0,0.5)",
+                  },
                 },
-              },
-              labels: {
-                text: {
-                  fontFamily: 'Inter Tight, sans-serif',
-                  fontWeight: 600,
-                  fontSize: 13,
-                  fill: '#E1E4EA',
-                  cursor: 'pointer',
+                labels: {
+                  text: {
+                    fontFamily: "Inter Tight, sans-serif",
+                    fontWeight: 600,
+                    fontSize: 13,
+                    fill: "#E1E4EA",
+                    cursor: "pointer",
+                  },
                 },
-              },
-            }}
-            valueFormat={value => `LKR ${value.toLocaleString()}`}
-          />
+              }}
+              valueFormat={(value) => `LKR ${value.toLocaleString()}`}
+            />
+          )}
         </div>
 
         {/* Bottom Bar */}
@@ -324,24 +574,33 @@ export function CashflowPage() {
             <div className="flex items-center gap-[24px]">
               <div className="flex items-center gap-[8px]">
                 <div className="size-[10px] rounded-[2px] bg-[#10B981]" />
-                <span className="text-[#99a0ae] text-[12px] font-medium">Income Flow</span>
+                <span className="text-[#99a0ae] text-[12px] font-medium">
+                  Income Flow
+                </span>
               </div>
               <div className="flex items-center gap-[8px]">
                 <div className="size-[10px] rounded-[2px] bg-[#EF4444]" />
-                <span className="text-[#99a0ae] text-[12px] font-medium">Expense Flow</span>
+                <span className="text-[#99a0ae] text-[12px] font-medium">
+                  Expense Flow
+                </span>
               </div>
               <div className="flex items-center gap-[8px]">
                 <div className="size-[10px] rounded-[2px] bg-[#606980]" />
-                <span className="text-[#99a0ae] text-[12px] font-medium">Cash Flow Hub</span>
+                <span className="text-[#99a0ae] text-[12px] font-medium">
+                  Cash Flow Hub
+                </span>
               </div>
             </div>
           )}
 
-          <Select.Root value={period} onValueChange={(val) => {
-            setPeriod(val);
-            const label = periods.find(p => p.value === val)?.label;
-            toast.info(`Showing cash flow for ${label}`);
-          }}>
+          <Select.Root
+            value={period}
+            onValueChange={(val) => {
+              setPeriod(val)
+              const label = periods.find((p) => p.value === val)?.label
+              toast.info(`Showing cash flow for ${label}`)
+            }}
+          >
             <Select.Trigger className="bg-[#101214] border border-[#2e2f33] rounded-[10px] h-[36px] px-[12px] flex items-center gap-[8px] text-white text-[13px] font-medium outline-none hover:bg-white/[0.04] transition-colors cursor-pointer">
               <Calendar size={14} className="text-[#717784]" />
               <Select.Value />
@@ -352,7 +611,7 @@ export function CashflowPage() {
             <Select.Portal>
               <Select.Content className="z-50 bg-[#101214] border border-[#2e2f33] rounded-[12px] p-[6px] shadow-2xl animate-in fade-in zoom-in-95 duration-200">
                 <Select.Viewport>
-                  {periods.map(p => (
+                  {periods.map((p) => (
                     <Select.Item
                       key={p.value}
                       value={p.value}
@@ -366,8 +625,7 @@ export function CashflowPage() {
             </Select.Portal>
           </Select.Root>
         </div>
-
       </div>
     </div>
-  );
+  )
 }
